@@ -1,0 +1,92 @@
+configuration {
+    modi: "drun";
+    show-icons: true;
+    font: "Fira Code Retina 14";
+    dynamic: false;
+    window-width: 800px;
+    window-height: 500px;
+    drun-display-format: "{name}";
+}
+
+* {
+    background-color: #000000;
+    text-color: #fff8cb;
+}
+
+window {
+    background-color: #000000;
+    border: 1px; 
+    border-color: #fff8cb;
+    width: 800px;
+    height: 500px;
+    location: center;
+    anchor: center;
+    dynamic: false;
+}
+
+mainbox {
+    children: [ left-panel, right-image ];
+    orientation: horizontal;
+    spacing: 10px;
+    padding: 10px;
+}
+
+left-panel {
+    children: [ inputbar, listview ];
+    orientation: vertical;
+    expand: true;
+    spacing: 5px;
+}
+
+inputbar {
+    children: [ entry ];
+    orientation: horizontal;
+    spacing: 0px;
+    padding: 2px;
+    background-color: #000000;
+}
+
+entry {
+    background-color: #000000;
+    text-color: #fff8cb;
+    placeholder-text: "";
+    border: 0 0 0 0px;
+    border-color: #fff8cb;
+}
+
+prompt {
+    visible: false;
+    width: 0;
+}
+
+listview {
+    scrollbar: false;
+    dynamic: false;
+    fixed-height: true;
+    border: none;
+    background-color: #000000;
+}
+
+element {
+    border:0 0 0 0px;
+    border-color: #efe6bc;
+    margin: 0px 0;
+    padding: 0 0 0 0px;
+    background-color: #000000;
+}
+
+element selected {
+    background-color: #3a351a;
+    border:1 1 1 1px;
+    border-color: #fff8cb;
+}
+
+element-text {
+    text-color: #fff8cb;
+}
+
+right-image {
+     
+    background-image: url("img.png");
+    
+}
