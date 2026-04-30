@@ -1,0 +1,2 @@
+polybar -c /home/USER_NAME/.config/polybar/polybar_DP-5.ini
+polybar -c /home/UESR_NAME/.config/polybar/polybar_HDMI.ini
