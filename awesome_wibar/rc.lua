@@ -37,7 +37,7 @@ end
 -- }}}
 
 -- {{{ Variable definitions
-beautiful.init(gears.filesystem.get_themes_dir() .. "default/theme.lua")
+beautiful.init(gears.filesystem.get_configuration_dir() .. "theme.lua")
 
 -- ████████████████████████████████████████████████████████████████████████
 -- ◀ НАСТРОЙКИ СТИЛЯ (как в polybar) ▶
@@ -274,6 +274,45 @@ gears.timer {
     autostart = true,
     callback = update_volume_icon,
 }
+
+-- 4️⃣ Виджет названия текущего макета (слева от громкости)
+local function get_layout_name(layout)
+    local names = {
+        [awful.layout.suit.floating] = "float",
+        [awful.layout.suit.tile] = "tile",
+        [awful.layout.suit.tile.left] = "tile←",
+        [awful.layout.suit.tile.bottom] = "tile↓",
+        [awful.layout.suit.tile.top] = "tile↑",
+    }
+    return names[layout] or "?"
+end
+
+local layout_text_widget = wibox.widget.textbox()
+layout_text_widget.font = beautiful.font
+
+local function update_layout_widget(s)
+    local tag = s.selected_tag
+    if tag then
+        local name = get_layout_name(tag.layout)
+        layout_text_widget.markup = '<span foreground="#ffffff">' .. name .. '</span>'
+    end
+end
+
+-- Обновление при смене тега или макета
+tag.connect_signal("property::selected", function(t)
+    update_layout_widget(t.screen)
+end)
+tag.connect_signal("property::layout", function(t)
+    if t == t.screen.selected_tag then
+        update_layout_widget(t.screen)
+    end
+end)
+
+-- Инициализация для каждого экрана
+awful.screen.connect_for_each_screen(function(s)
+    update_layout_widget(s)
+end)
+
 -- 3️⃣ Виджет даты/времени (будет выровнен по центру)
 local clock_widget = wibox.widget.textclock('<span foreground="#ffffff">%a, %d %b %Y %H:%M:%S</span>', 1)
 clock_widget.font = beautiful.font
@@ -310,8 +349,9 @@ awful.screen.connect_for_each_screen(function(s)
     
     -- Левая часть (теги) и правая часть (только громкость)
     local left_box = wibox.widget { tag_widget, layout = wibox.layout.fixed.horizontal }
-    local right_box = wibox.widget { volume_widget, layout = wibox.layout.fixed.horizontal }
-    
+
+local right_box = wibox.widget { layout_text_widget, volume_widget, layout = wibox.layout.fixed.horizontal, spacing = 8 }   
+ 
     -- Центрирование часов
     local centered_clock = wibox.container.place(clock_widget, { halign = "center", valign = "center" })
     
