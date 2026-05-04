@@ -163,7 +163,21 @@ local function create_tag_widget(s)
     return container
 end
 
--- 2️⃣ Виджет громкости (единственный правый виджет, без клавиатуры)
+-- 2️⃣ Виджет громкости (работает с PipeWire через wpctl или pactl)
+local function get_volume_command()
+    -- Проверяем, существует ли wpctl (нативный клиент PipeWire/WirePlumber)
+    local handle = io.popen("command -v wpctl")
+    local result = handle:read("*a")
+    handle:close()
+    if result and result ~= "" then
+        return "wpctl"
+    else
+        return "pactl"
+    end
+end
+
+local volume_backend = get_volume_command()
+
 local volume_widget = wibox.widget {
     {
         id = "icon",
@@ -174,43 +188,92 @@ local volume_widget = wibox.widget {
 }
 
 local function update_volume_icon()
-    awful.spawn.easy_async(
-        "sh -c 'pactl get-sink-mute @DEFAULT_SINK@ && pactl get-sink-volume @DEFAULT_SINK@ | grep -oP \"\\d+%\" | head -1'",
-        function(stdout)
-            local mute, percent = stdout:match("(.+)\n(.+)")
-            if not percent then percent = stdout end
-            percent = tonumber(percent:match("(%d+)")) or 0
+    if volume_backend == "wpctl" then
+        -- Получаем громкость и mute через wpctl
+        awful.spawn.easy_async("wpctl get-volume @DEFAULT_AUDIO_SINK@", function(stdout)
+            local muted = false
+            local volume_percent = 0
+            -- Пример вывода: "Volume: 0.45 [MUTED]" или "Volume: 0.78"
+            local volume_str = stdout:match("Volume: (%d+%.?%d*)")
+            if volume_str then
+                volume_percent = math.floor(tonumber(volume_str) * 100)
+            end
+            if stdout:find("MUTED") then
+                muted = true
+            end
             local icon_char
-            if mute and mute:match("Mute: yes") then
+            if muted then
                 icon_char = "󰝟"
-            elseif percent == 0 then
+            elseif volume_percent == 0 then
                 icon_char = "󰕿"
-            elseif percent < 33 then
+            elseif volume_percent < 33 then
                 icon_char = "󰕿"
-            elseif percent < 66 then
+            elseif volume_percent < 66 then
                 icon_char = "󰖀"
             else
                 icon_char = "󰕾"
             end
             volume_widget.icon.markup = '<span font="' .. beautiful.icon_font .. '">' .. icon_char .. '</span>'
-        end
-    )
+        end)
+    else
+        -- Старый способ через pactl (для совместимости с PulseAudio)
+        awful.spawn.easy_async(
+            "sh -c 'pactl get-sink-mute @DEFAULT_SINK@ && pactl get-sink-volume @DEFAULT_SINK@ | grep -oP \"\\d+%\" | head -1'",
+            function(stdout)
+                local mute, percent = stdout:match("(.+)\n(.+)")
+                if not percent then percent = stdout end
+                percent = tonumber(percent:match("(%d+)")) or 0
+                local icon_char
+                if mute and mute:match("Mute: yes") then
+                    icon_char = "󰝟"
+                elseif percent == 0 then
+                    icon_char = "󰕿"
+                elseif percent < 33 then
+                    icon_char = "󰕿"
+                elseif percent < 66 then
+                    icon_char = "󰖀"
+                else
+                    icon_char = "󰕾"
+                end
+                volume_widget.icon.markup = '<span font="' .. beautiful.icon_font .. '">' .. icon_char .. '</span>'
+            end
+        )
+    end
+end
+
+-- Привязка кнопок с учётом бэкенда
+local function change_volume(delta)
+    if volume_backend == "wpctl" then
+        awful.spawn(string.format("wpctl set-volume @DEFAULT_AUDIO_SINK@ %d%%", delta), false)
+    else
+        awful.spawn(string.format("pactl set-sink-volume @DEFAULT_SINK@ %s%%", delta >= 0 and ("+"..delta) or delta), false)
+    end
+    update_volume_icon()
+end
+
+local function toggle_mute()
+    if volume_backend == "wpctl" then
+        awful.spawn("wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle", false)
+    else
+        awful.spawn("pactl set-sink-mute @DEFAULT_SINK@ toggle", false)
+    end
+    update_volume_icon()
 end
 
 volume_widget:buttons(gears.table.join(
-    awful.button({}, 1, function() awful.spawn("pavucontrol") end),
-    awful.button({}, 4, function() awful.spawn("pactl set-sink-volume @DEFAULT_SINK@ +5%"); update_volume_icon() end),
-    awful.button({}, 5, function() awful.spawn("pactl set-sink-volume @DEFAULT_SINK@ -5%"); update_volume_icon() end),
-    awful.button({}, 2, function() awful.spawn("pactl set-sink-mute @DEFAULT_SINK@ toggle"); update_volume_icon() end)
+    awful.button({}, 1, function() awful.spawn("pavucontrol") end),  -- открыть pavucontrol
+    awful.button({}, 4, function() change_volume(5) end),             -- колесо вверх (+5%)
+    awful.button({}, 5, function() change_volume(-5) end),            -- колесо вниз (-5%)
+    awful.button({}, 2, function() toggle_mute() end)                 -- средняя кнопка (mute)
 ))
 
+-- Обновление иконки каждые 2 секунды
 gears.timer {
     timeout = 2,
     call_now = true,
     autostart = true,
     callback = update_volume_icon,
 }
-
 -- 3️⃣ Виджет даты/времени (будет выровнен по центру)
 local clock_widget = wibox.widget.textclock('<span foreground="#ffffff">%a, %d %b %Y %H:%M:%S</span>', 1)
 clock_widget.font = beautiful.font
