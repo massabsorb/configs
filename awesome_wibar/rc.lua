@@ -98,15 +98,15 @@ menubar.utils.terminal = terminal
 
 -- 1️⃣ Иконки для рабочих столов (NERD FONTS)
 local tags_icons = {
-    [1] = "",   -- web
-    [2] = "",   -- code
-    [3] = "",   -- music
-    [4] = "",   -- files
-    [5] = "",   -- chat
-    [6] = "",   -- graphics
-    [7] = "",   -- misc
-    [8] = "",   -- term
-    [9] = "",   -- video
+    [1] = "󰬺",   -- web
+    [2] = "󰬻",   -- code
+    [3] = "󰬼",   -- music
+    [4] = "󰬽",   -- files
+    [5] = "󰬾",   -- chat
+    [6] = "󰬿",   -- graphics
+    [7] = "󰭀",   -- misc
+    [8] = "󰭁",   -- term
+    [9] = "󰭂",   -- video
 }
 
 -- ★★★ КАСТОМНЫЙ ВИДЖЕТ ТЕГОВ (ТОЛЬКО ИКОНКИ, С РАССТОЯНИЕМ) ★★★
@@ -278,11 +278,11 @@ gears.timer {
 -- 4️⃣ Виджет названия текущего макета (слева от громкости)
 local function get_layout_name(layout)
     local names = {
-        [awful.layout.suit.floating] = "float",
-        [awful.layout.suit.tile] = "tile",
-        [awful.layout.suit.tile.left] = "tile←",
-        [awful.layout.suit.tile.bottom] = "tile↓",
-        [awful.layout.suit.tile.top] = "tile↑",
+        [awful.layout.suit.floating] = "FLOAT",
+        [awful.layout.suit.tile] = "TILE",
+        [awful.layout.suit.tile.left] = "TILE←",
+        [awful.layout.suit.tile.bottom] = "TILE↓",
+        [awful.layout.suit.tile.top] = "TILE↑",
     }
     return names[layout] or "?"
 end
