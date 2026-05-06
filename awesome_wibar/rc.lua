@@ -109,11 +109,11 @@ local tags_icons = {
     [9] = "󰭂",   -- video
 }
 
--- ★★★ КАСТОМНЫЙ ВИДЖЕТ ТЕГОВ (ТОЛЬКО ИКОНКИ, С РАССТОЯНИЕМ) ★★★
+-- ★★★ КАСТОМНЫЙ ВИДЖЕТ ТЕГОВ (ТОЛЬКО ИКОНКИ) ★★★
 local function create_tag_widget(s)
     local container = wibox.widget {
         layout = wibox.layout.fixed.horizontal,
-        spacing = 8,   -- ← УВЕЛИЧЕННЫЙ ОТСТУП МЕЖДУ ТЕГАМИ
+        spacing = 8,
     }
     
     local function update_tags()
@@ -163,11 +163,11 @@ local function create_tag_widget(s)
     return container
 end
 
--- ★★★ ВИДЖЕТ ИКОНОК ЗАПУЩЕННЫХ ПРОГРАММ (только для текущего тега) ★★★
+-- ★★★ ВИДЖЕТ ИКОНОК ЗАПУЩЕННЫХ ПРОГРАММ (увеличенные 24px) ★★★
 local function create_task_icons_widget(s)
     local container = wibox.widget {
         layout = wibox.layout.fixed.horizontal,
-        spacing = 4,   -- расстояние между иконками
+        spacing = 8,
     }
 
     local function update_task_icons()
@@ -175,15 +175,12 @@ local function create_task_icons_widget(s)
         local tag = s.selected_tag
         if not tag then return end
 
-        -- Получаем все окна на текущем теге
         local clients = tag:clients()
         for _, c in ipairs(clients) do
-            -- Пытаемся получить иконку клиента
             local icon_img = nil
             if c.icon then
                 icon_img = c.icon
             elseif c.icon_name and c.icon_name ~= "" then
-                -- Попытка загрузить иконку по имени (не всегда работает)
                 icon_img = gears.surface(c.icon_name)
             end
 
@@ -192,20 +189,18 @@ local function create_task_icons_widget(s)
                 icon_widget = wibox.widget {
                     image = icon_img,
                     resize = true,
-                    forced_width = 30,
-                    forced_height = 30,
+                    forced_width = 24,
+                    forced_height = 24,
                     widget = wibox.widget.imagebox
                 }
             else
-                -- Заглушка, если иконки нет — первая буква имени окна
                 local first_letter = string.sub(c.name or "?", 1, 1)
                 icon_widget = wibox.widget {
-                    markup = '<span font="' .. beautiful.font .. '">' .. first_letter .. '</span>',
+                    markup = '<span font="JetBrains Mono 14">' .. first_letter .. '</span>',
                     widget = wibox.widget.textbox
                 }
             end
 
-            -- Делаем иконку кликабельной: фокус на окно при левом клике
             icon_widget:buttons(gears.table.join(
                 awful.button({}, 1, function()
                     c:emit_signal("request::activate", "task_icon", {raise = true})
@@ -216,7 +211,6 @@ local function create_task_icons_widget(s)
         end
     end
 
-    -- Сигналы, при которых нужно обновлять иконки
     tag.connect_signal("property::selected", function(t)
         if t.screen == s and t == s.selected_tag then
             update_task_icons()
@@ -250,7 +244,7 @@ local function create_task_icons_widget(s)
     return container
 end
 
--- 2️⃣ Виджет громкости (работает с PipeWire через wpctl или pactl)
+-- 2️⃣ Виджет громкости (PipeWire/PulseAudio)
 local function get_volume_command()
     local handle = io.popen("command -v wpctl")
     local result = handle:read("*a")
@@ -356,7 +350,7 @@ gears.timer {
     callback = update_volume_icon,
 }
 
--- 4️⃣ Виджет названия текущего макета
+-- Виджет названия текущего макета
 local function get_layout_name(layout)
     local names = {
         [awful.layout.suit.floating] = "FLOAT",
@@ -388,10 +382,6 @@ tag.connect_signal("property::layout", function(t)
     end
 end)
 
--- 3️⃣ Виджет даты/времени
-local clock_widget = wibox.widget.textclock('<span foreground="#ffffff">%a, %d %b %Y %H:%M:%S</span>', 1)
-clock_widget.font = beautiful.font
-
 -- ████████████████████████████████████████████████████████████████████████
 
 -- {{{ Wibar
@@ -419,35 +409,31 @@ awful.screen.connect_for_each_screen(function(s)
         awful.button({ }, 5, function () awful.layout.inc(-1) end)
     ))
 
-    -- Кастомный виджет тегов
+    -- Виджеты
     local tag_widget = create_tag_widget(s)
-    -- ★★★ НОВЫЙ ВИДЖЕТ ИКОНОК ЗАПУЩЕННЫХ ПРОГРАММ ★★★
     local task_icons_widget = create_task_icons_widget(s)
-    
-    -- Левая часть: теги + иконки задач (с отступом)
+
+    -- Левая часть (теги + иконки задач)
     local left_box = wibox.widget {
         tag_widget,
         task_icons_widget,
         layout = wibox.layout.fixed.horizontal,
-        spacing = 12,   -- отступ между тегами и списком иконок
+        spacing = 12,
     }
 
-    -- Правая часть: макет + громкость
+    -- Правая часть (макет + громкость)
     local right_box = wibox.widget {
         layout_text_widget,
         volume_widget,
         layout = wibox.layout.fixed.horizontal,
         spacing = 8,
-    }   
- 
-    -- Центрирование часов
-    local centered_clock = wibox.container.place(clock_widget, { halign = "center", valign = "center" })
-    
-    -- Панель внизу
+    }
+
+    -- Панель
     s.mywibox = awful.wibar({
         position = "bottom",
         screen = s,
-        height = 28,
+        height = 34,
         bg = beautiful.bg_normal,
         fg = beautiful.fg_normal,
         border_width = beautiful.border_width,
@@ -457,19 +443,19 @@ awful.screen.connect_for_each_screen(function(s)
         visible = true,
         stretch = true,
     })
-    
-    -- Размещение: лево, центр (расширяется), право
+
+    -- Размещение: левая часть, пустой центр, правая часть
     s.mywibox:setup {
         layout = wibox.layout.align.horizontal,
         left_box,
-        centered_clock,
+        nil,   -- центральный виджет отсутствует (часы удалены)
         right_box,
     }
 end)
 -- }}}
 
--- (Остальная часть вашего конфига: мышиные привязки, клавиши, правила, сигналы — без изменений)
--- Я скопирую их из вашего исходного файла для полноты.
+-- (Все остальные части конфига — клавиши, мышь, правила, сигналы — без изменений)
+-- Они приведены ниже для полноты.
 
 -- {{{ Mouse bindings
 root.buttons(gears.table.join(
