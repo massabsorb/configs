@@ -113,7 +113,7 @@ local tags_icons = {
 local function create_tag_widget(s)
     local container = wibox.widget {
         layout = wibox.layout.fixed.horizontal,
-        spacing = 8,   -- ← УВЕЛИЧЕННЫЙ ОТСТУП МЕЖДУ ТЕГАМИ (было 2)
+        spacing = 8,   -- ← УВЕЛИЧЕННЫЙ ОТСТУП МЕЖДУ ТЕГАМИ
     }
     
     local function update_tags()
@@ -163,9 +163,95 @@ local function create_tag_widget(s)
     return container
 end
 
+-- ★★★ ВИДЖЕТ ИКОНОК ЗАПУЩЕННЫХ ПРОГРАММ (только для текущего тега) ★★★
+local function create_task_icons_widget(s)
+    local container = wibox.widget {
+        layout = wibox.layout.fixed.horizontal,
+        spacing = 4,   -- расстояние между иконками
+    }
+
+    local function update_task_icons()
+        container:reset()
+        local tag = s.selected_tag
+        if not tag then return end
+
+        -- Получаем все окна на текущем теге
+        local clients = tag:clients()
+        for _, c in ipairs(clients) do
+            -- Пытаемся получить иконку клиента
+            local icon_img = nil
+            if c.icon then
+                icon_img = c.icon
+            elseif c.icon_name and c.icon_name ~= "" then
+                -- Попытка загрузить иконку по имени (не всегда работает)
+                icon_img = gears.surface(c.icon_name)
+            end
+
+            local icon_widget
+            if icon_img then
+                icon_widget = wibox.widget {
+                    image = icon_img,
+                    resize = true,
+                    forced_width = 30,
+                    forced_height = 30,
+                    widget = wibox.widget.imagebox
+                }
+            else
+                -- Заглушка, если иконки нет — первая буква имени окна
+                local first_letter = string.sub(c.name or "?", 1, 1)
+                icon_widget = wibox.widget {
+                    markup = '<span font="' .. beautiful.font .. '">' .. first_letter .. '</span>',
+                    widget = wibox.widget.textbox
+                }
+            end
+
+            -- Делаем иконку кликабельной: фокус на окно при левом клике
+            icon_widget:buttons(gears.table.join(
+                awful.button({}, 1, function()
+                    c:emit_signal("request::activate", "task_icon", {raise = true})
+                end)
+            ))
+
+            container:add(icon_widget)
+        end
+    end
+
+    -- Сигналы, при которых нужно обновлять иконки
+    tag.connect_signal("property::selected", function(t)
+        if t.screen == s and t == s.selected_tag then
+            update_task_icons()
+        end
+    end)
+
+    client.connect_signal("manage", function(c)
+        if c.screen == s and c:isvisible() then
+            update_task_icons()
+        end
+    end)
+
+    client.connect_signal("unmanage", function(c)
+        if c.screen == s then
+            update_task_icons()
+        end
+    end)
+
+    client.connect_signal("tagged", function(c)
+        if c.screen == s then update_task_icons() end
+    end)
+    client.connect_signal("untagged", function(c)
+        if c.screen == s then update_task_icons() end
+    end)
+
+    client.connect_signal("property::visible", function(c)
+        if c.screen == s then update_task_icons() end
+    end)
+
+    update_task_icons()
+    return container
+end
+
 -- 2️⃣ Виджет громкости (работает с PipeWire через wpctl или pactl)
 local function get_volume_command()
-    -- Проверяем, существует ли wpctl (нативный клиент PipeWire/WirePlumber)
     local handle = io.popen("command -v wpctl")
     local result = handle:read("*a")
     handle:close()
@@ -189,11 +275,9 @@ local volume_widget = wibox.widget {
 
 local function update_volume_icon()
     if volume_backend == "wpctl" then
-        -- Получаем громкость и mute через wpctl
         awful.spawn.easy_async("wpctl get-volume @DEFAULT_AUDIO_SINK@", function(stdout)
             local muted = false
             local volume_percent = 0
-            -- Пример вывода: "Volume: 0.45 [MUTED]" или "Volume: 0.78"
             local volume_str = stdout:match("Volume: (%d+%.?%d*)")
             if volume_str then
                 volume_percent = math.floor(tonumber(volume_str) * 100)
@@ -216,7 +300,6 @@ local function update_volume_icon()
             volume_widget.icon.markup = '<span font="' .. beautiful.icon_font .. '">' .. icon_char .. '</span>'
         end)
     else
-        -- Старый способ через pactl (для совместимости с PulseAudio)
         awful.spawn.easy_async(
             "sh -c 'pactl get-sink-mute @DEFAULT_SINK@ && pactl get-sink-volume @DEFAULT_SINK@ | grep -oP \"\\d+%\" | head -1'",
             function(stdout)
@@ -241,7 +324,6 @@ local function update_volume_icon()
     end
 end
 
--- Привязка кнопок с учётом бэкенда
 local function change_volume(delta)
     if volume_backend == "wpctl" then
         awful.spawn(string.format("wpctl set-volume @DEFAULT_AUDIO_SINK@ %d%%", delta), false)
@@ -261,13 +343,12 @@ local function toggle_mute()
 end
 
 volume_widget:buttons(gears.table.join(
-    awful.button({}, 1, function() awful.spawn("pavucontrol") end),  -- открыть pavucontrol
-    awful.button({}, 4, function() change_volume(5) end),             -- колесо вверх (+5%)
-    awful.button({}, 5, function() change_volume(-5) end),            -- колесо вниз (-5%)
-    awful.button({}, 2, function() toggle_mute() end)                 -- средняя кнопка (mute)
+    awful.button({}, 1, function() awful.spawn("pavucontrol") end),
+    awful.button({}, 4, function() change_volume(5) end),
+    awful.button({}, 5, function() change_volume(-5) end),
+    awful.button({}, 2, function() toggle_mute() end)
 ))
 
--- Обновление иконки каждые 2 секунды
 gears.timer {
     timeout = 2,
     call_now = true,
@@ -275,7 +356,7 @@ gears.timer {
     callback = update_volume_icon,
 }
 
--- 4️⃣ Виджет названия текущего макета (слева от громкости)
+-- 4️⃣ Виджет названия текущего макета
 local function get_layout_name(layout)
     local names = {
         [awful.layout.suit.floating] = "FLOAT",
@@ -298,7 +379,6 @@ local function update_layout_widget(s)
     end
 end
 
--- Обновление при смене тега или макета
 tag.connect_signal("property::selected", function(t)
     update_layout_widget(t.screen)
 end)
@@ -308,12 +388,7 @@ tag.connect_signal("property::layout", function(t)
     end
 end)
 
--- Инициализация для каждого экрана
-awful.screen.connect_for_each_screen(function(s)
-    update_layout_widget(s)
-end)
-
--- 3️⃣ Виджет даты/времени (будет выровнен по центру)
+-- 3️⃣ Виджет даты/времени
 local clock_widget = wibox.widget.textclock('<span foreground="#ffffff">%a, %d %b %Y %H:%M:%S</span>', 1)
 clock_widget.font = beautiful.font
 
@@ -346,11 +421,24 @@ awful.screen.connect_for_each_screen(function(s)
 
     -- Кастомный виджет тегов
     local tag_widget = create_tag_widget(s)
+    -- ★★★ НОВЫЙ ВИДЖЕТ ИКОНОК ЗАПУЩЕННЫХ ПРОГРАММ ★★★
+    local task_icons_widget = create_task_icons_widget(s)
     
-    -- Левая часть (теги) и правая часть (только громкость)
-    local left_box = wibox.widget { tag_widget, layout = wibox.layout.fixed.horizontal }
+    -- Левая часть: теги + иконки задач (с отступом)
+    local left_box = wibox.widget {
+        tag_widget,
+        task_icons_widget,
+        layout = wibox.layout.fixed.horizontal,
+        spacing = 12,   -- отступ между тегами и списком иконок
+    }
 
-local right_box = wibox.widget { layout_text_widget, volume_widget, layout = wibox.layout.fixed.horizontal, spacing = 8 }   
+    -- Правая часть: макет + громкость
+    local right_box = wibox.widget {
+        layout_text_widget,
+        volume_widget,
+        layout = wibox.layout.fixed.horizontal,
+        spacing = 8,
+    }   
  
     -- Центрирование часов
     local centered_clock = wibox.container.place(clock_widget, { halign = "center", valign = "center" })
@@ -380,6 +468,9 @@ local right_box = wibox.widget { layout_text_widget, volume_widget, layout = wib
 end)
 -- }}}
 
+-- (Остальная часть вашего конфига: мышиные привязки, клавиши, правила, сигналы — без изменений)
+-- Я скопирую их из вашего исходного файла для полноты.
+
 -- {{{ Mouse bindings
 root.buttons(gears.table.join(
     awful.button({ }, 3, function () mymainmenu:toggle() end),
@@ -388,7 +479,7 @@ root.buttons(gears.table.join(
 ))
 -- }}}
 
--- {{{ Key bindings (ваши старые, сохранены)
+-- {{{ Key bindings
 globalkeys = gears.table.join(
     awful.key({ modkey,           }, "s",      hotkeys_popup.show_help,
               {description="show help", group="awesome"}),
