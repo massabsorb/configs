@@ -64,7 +64,7 @@ editor_cmd = terminal .. " -e " .. editor
 modkey = "Mod4"
 
 awful.layout.layouts = {
-    awful.layout.suit.floating,
+    --awful.layout.suit.floating,
     awful.layout.suit.tile,
     awful.layout.suit.tile.left,
     awful.layout.suit.tile.bottom,
@@ -382,6 +382,32 @@ tag.connect_signal("property::layout", function(t)
     end
 end)
 
+-- ★★★ НОВЫЙ ВИДЖЕТ ВРЕМЕНИ И ДАТЫ ★★★
+local clock_widget = wibox.widget.textbox()
+clock_widget.font = beautiful.font
+
+local function update_clock()
+    local now = os.date("*t")
+    local months = { "янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек" }
+    local weekdays = { "Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб" }
+    local date_str = string.format("%s %02d %s %02d:%02d:%02d",
+        weekdays[now.wday],
+        now.day,
+        months[now.month],
+        now.hour,
+        now.min,
+        now.sec
+    )
+    clock_widget:set_markup('<span foreground="#ffffff">' .. date_str .. '</span>')
+end
+
+gears.timer {
+    timeout = 1,
+    call_now = true,
+    autostart = true,
+    callback = update_clock,
+}
+
 -- ████████████████████████████████████████████████████████████████████████
 
 -- {{{ Wibar
@@ -421,8 +447,9 @@ awful.screen.connect_for_each_screen(function(s)
         spacing = 12,
     }
 
-    -- Правая часть (макет + громкость)
+    -- Правая часть (часы, макет, громкость)
     local right_box = wibox.widget {
+        clock_widget,
         layout_text_widget,
         volume_widget,
         layout = wibox.layout.fixed.horizontal,
@@ -448,14 +475,11 @@ awful.screen.connect_for_each_screen(function(s)
     s.mywibox:setup {
         layout = wibox.layout.align.horizontal,
         left_box,
-        nil,   -- центральный виджет отсутствует (часы удалены)
+        nil,   -- центральный виджет отсутствует
         right_box,
     }
 end)
 -- }}}
-
--- (Все остальные части конфига — клавиши, мышь, правила, сигналы — без изменений)
--- Они приведены ниже для полноты.
 
 -- {{{ Mouse bindings
 root.buttons(gears.table.join(
