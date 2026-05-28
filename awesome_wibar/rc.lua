@@ -16,6 +16,9 @@ local menubar = require("menubar")
 local hotkeys_popup = require("awful.hotkeys_popup")
 require("awful.hotkeys_popup.keys")
 
+-- Autostart
+awful.spawn("picom -b")
+
 -- {{{ Error handling
 if awesome.startup_errors then
     naughty.notify({ preset = naughty.config.presets.critical,
@@ -64,7 +67,7 @@ editor_cmd = terminal .. " -e " .. editor
 modkey = "Mod4"
 
 awful.layout.layouts = {
-    --awful.layout.suit.floating,
+    awful.layout.suit.floating,
     awful.layout.suit.tile,
     awful.layout.suit.tile.left,
     awful.layout.suit.tile.bottom,
@@ -491,6 +494,105 @@ root.buttons(gears.table.join(
 
 -- {{{ Key bindings
 globalkeys = gears.table.join(
+
+	    -- ★★★ ИЗМЕНЕНИЕ РАЗМЕРА FLOAT ОКОН С КЛАВИАТУРЫ ★★★
+    awful.key({ modkey, "Shift" }, "Left", function()
+        local c = client.focus
+        if c then
+            local is_floating = c.floating or (c.first_tag and c.first_tag.layout == awful.layout.suit.floating)
+            if is_floating then
+                local geo = c:geometry()
+                c:geometry({ x = geo.x, y = geo.y, width = math.max(50, geo.width - 30), height = geo.height })
+            end
+        end
+    end,
+    {description = "уменьшить ширину float окна", group = "client"}),
+
+    awful.key({ modkey, "Shift" }, "Right", function()
+        local c = client.focus
+        if c then
+            local is_floating = c.floating or (c.first_tag and c.first_tag.layout == awful.layout.suit.floating)
+            if is_floating then
+                local geo = c:geometry()
+                c:geometry({ x = geo.x, y = geo.y, width = geo.width + 30, height = geo.height })
+            end
+        end
+    end,
+    {description = "увеличить ширину float окна", group = "client"}),
+
+    awful.key({ modkey, "Shift" }, "Up", function()
+        local c = client.focus
+        if c then
+            local is_floating = c.floating or (c.first_tag and c.first_tag.layout == awful.layout.suit.floating)
+            if is_floating then
+                local geo = c:geometry()
+                c:geometry({ x = geo.x, y = geo.y, width = geo.width, height = math.max(50, geo.height - 30) })
+            end
+        end
+    end,
+    {description = "уменьшить высоту float окна", group = "client"}),
+
+    awful.key({ modkey, "Shift" }, "Down", function()
+        local c = client.focus
+        if c then
+            local is_floating = c.floating or (c.first_tag and c.first_tag.layout == awful.layout.suit.floating)
+            if is_floating then
+                local geo = c:geometry()
+                c:geometry({ x = geo.x, y = geo.y, width = geo.width, height = geo.height + 30 })
+            end
+        end
+    end,
+    {description = "увеличить высоту float окна", group = "client"}),
+
+        -- ★★★ ПЕРЕМЕЩЕНИЕ FLOAT ОКОН С КЛАВИАТУРЫ ★★★
+    awful.key({ modkey, "Control" }, "Left", function()
+        local c = client.focus
+        if c then
+            local is_floating = c.floating or (c.first_tag and c.first_tag.layout == awful.layout.suit.floating)
+            if is_floating then
+                local geo = c:geometry()
+                c:geometry({ x = geo.x - 60, y = geo.y, width = geo.width, height = geo.height })
+            end
+        end
+    end,
+    {description = "переместить float окно влево", group = "client"}),
+
+    awful.key({ modkey, "Control" }, "Right", function()
+        local c = client.focus
+        if c then
+            local is_floating = c.floating or (c.first_tag and c.first_tag.layout == awful.layout.suit.floating)
+            if is_floating then
+                local geo = c:geometry()
+                c:geometry({ x = geo.x + 60, y = geo.y, width = geo.width, height = geo.height })
+            end
+        end
+    end,
+    {description = "переместить float окно вправо", group = "client"}),
+
+    awful.key({ modkey, "Control" }, "Up", function()
+        local c = client.focus
+        if c then
+            local is_floating = c.floating or (c.first_tag and c.first_tag.layout == awful.layout.suit.floating)
+            if is_floating then
+                local geo = c:geometry()
+                c:geometry({ x = geo.x, y = geo.y - 60, width = geo.width, height = geo.height })
+            end
+        end
+    end,
+    {description = "переместить float окно вверх", group = "client"}),
+
+    awful.key({ modkey, "Control" }, "Down", function()
+        local c = client.focus
+        if c then
+            local is_floating = c.floating or (c.first_tag and c.first_tag.layout == awful.layout.suit.floating)
+            if is_floating then
+                local geo = c:geometry()
+                c:geometry({ x = geo.x, y = geo.y + 60, width = geo.width, height = geo.height })
+            end
+        end
+    end,
+    {description = "переместить float окно вниз", group = "client"}),
+
     awful.key({ modkey,           }, "s",      hotkeys_popup.show_help,
               {description="show help", group="awesome"}),
     awful.key({ modkey,           }, "Left",   awful.tag.viewprev,
