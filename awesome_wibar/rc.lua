@@ -1,27 +1,20 @@
--- If LuaRocks is installed, make sure that packages installed through it are
--- found (e.g. lgi). If LuaRocks is not installed, do nothing.
 pcall(require, "luarocks.loader")
 
--- Standard awesome library
 local gears = require("gears")
 local awful = require("awful")
 require("awful.autofocus")
--- Widget and layout library
 local wibox = require("wibox")
--- Theme handling library
 local beautiful = require("beautiful")
--- Notification library
 local naughty = require("naughty")
 local menubar = require("menubar")
 local hotkeys_popup = require("awful.hotkeys_popup")
 require("awful.hotkeys_popup.keys")
 
--- Autostart
 awful.spawn("picom -b")
 
--- {{{ Error handling
 if awesome.startup_errors then
-    naughty.notify({ preset = naughty.config.presets.critical,
+
+	naughty.notify({ preset = naughty.config.presets.critical,
                      title = "Oops, there were errors during startup!",
                      text = awesome.startup_errors })
 end
@@ -37,14 +30,9 @@ do
         in_error = false
     end)
 end
--- }}}
 
--- {{{ Variable definitions
 beautiful.init(gears.filesystem.get_configuration_dir() .. "theme.lua")
 
--- ████████████████████████████████████████████████████████████████████████
--- ◀ НАСТРОЙКИ СТИЛЯ (как в polybar) ▶
--- ████████████████████████████████████████████████████████████████████████
 beautiful.font = "JetBrains Mono 11"
 if not beautiful.icon_font then
     beautiful.icon_font = "Symbols Nerd Font Mono 13"
@@ -59,7 +47,6 @@ beautiful.fg_focus      = "#fff8cb"
 beautiful.fg_urgent     = "#ff5555"
 beautiful.border_width  = 2
 beautiful.border_color  = "#393869"
--- ████████████████████████████████████████████████████████████████████████
 
 terminal = "kitty"
 editor = os.getenv("EDITOR") or "nano"
@@ -68,14 +55,15 @@ modkey = "Mod4"
 
 awful.layout.layouts = {
     awful.layout.suit.floating,
-    awful.layout.suit.tile,
-    awful.layout.suit.tile.left,
-    awful.layout.suit.tile.bottom,
-    awful.layout.suit.tile.top,
+    --awful.layout.suit.tile,
+    --awful.layout.suit.tile.left,
+    --awful.layout.suit.tile.bottom,
+    --awful.layout.suit.tile.top,
 }
 -- }}}
 
 -- {{{ Menu
+--[[
 myawesomemenu = {
    { "hotkeys", function() hotkeys_popup.show_help(nil, awful.screen.focused()) end },
    { "manual", terminal .. " -e man awesome" },
@@ -94,25 +82,21 @@ mylauncher = awful.widget.launcher({ image = beautiful.awesome_icon,
 
 menubar.utils.terminal = terminal
 -- }}}
+--]]
 
--- ████████████████████████████████████████████████████████████████████████
--- ◀ ВИДЖЕТЫ В СТИЛЕ POLYBAR ▶
--- ████████████████████████████████████████████████████████████████████████
 
--- 1️⃣ Иконки для рабочих столов (NERD FONTS)
 local tags_icons = {
-    [1] = "󰬺",   -- web
-    [2] = "󰬻",   -- code
-    [3] = "󰬼",   -- music
-    [4] = "󰬽",   -- files
-    [5] = "󰬾",   -- chat
-    [6] = "󰬿",   -- graphics
-    [7] = "󰭀",   -- misc
-    [8] = "󰭁",   -- term
-    [9] = "󰭂",   -- video
+    [1] = "󰬺",   
+    [2] = "󰬻",   
+    [3] = "󰬼",    
+    [4] = "󰬽",   
+    [5] = "󰬾",   
+    [6] = "󰬿",   
+    [7] = "󰭀",   
+    [8] = "󰭁",   
+    [9] = "󰭂",   
 }
 
--- ★★★ КАСТОМНЫЙ ВИДЖЕТ ТЕГОВ (ТОЛЬКО ИКОНКИ) ★★★
 local function create_tag_widget(s)
     local container = wibox.widget {
         layout = wibox.layout.fixed.horizontal,
@@ -166,7 +150,6 @@ local function create_tag_widget(s)
     return container
 end
 
--- ★★★ ВИДЖЕТ ИКОНОК ЗАПУЩЕННЫХ ПРОГРАММ (увеличенные 24px) ★★★
 local function create_task_icons_widget(s)
     local container = wibox.widget {
         layout = wibox.layout.fixed.horizontal,
@@ -247,7 +230,6 @@ local function create_task_icons_widget(s)
     return container
 end
 
--- 2️⃣ Виджет громкости (PipeWire/PulseAudio)
 local function get_volume_command()
     local handle = io.popen("command -v wpctl")
     local result = handle:read("*a")
@@ -353,14 +335,16 @@ gears.timer {
     callback = update_volume_icon,
 }
 
--- Виджет названия текущего макета
 local function get_layout_name(layout)
     local names = {
+	    
         [awful.layout.suit.floating] = "FLOAT",
+	--[[
         [awful.layout.suit.tile] = "TILE",
         [awful.layout.suit.tile.left] = "TILE←",
         [awful.layout.suit.tile.bottom] = "TILE↓",
         [awful.layout.suit.tile.top] = "TILE↑",
+	--]]
     }
     return names[layout] or "?"
 end
@@ -385,7 +369,6 @@ tag.connect_signal("property::layout", function(t)
     end
 end)
 
--- ★★★ НОВЫЙ ВИДЖЕТ ВРЕМЕНИ И ДАТЫ ★★★
 local clock_widget = wibox.widget.textbox()
 clock_widget.font = beautiful.font
 
@@ -411,9 +394,7 @@ gears.timer {
     callback = update_clock,
 }
 
--- ████████████████████████████████████████████████████████████████████████
 
--- {{{ Wibar
 local function set_wallpaper(s)
     if beautiful.wallpaper then
         local wallpaper = beautiful.wallpaper
@@ -438,11 +419,9 @@ awful.screen.connect_for_each_screen(function(s)
         awful.button({ }, 5, function () awful.layout.inc(-1) end)
     ))
 
-    -- Виджеты
     local tag_widget = create_tag_widget(s)
     local task_icons_widget = create_task_icons_widget(s)
 
-    -- Левая часть (теги + иконки задач)
     local left_box = wibox.widget {
         tag_widget,
         task_icons_widget,
@@ -450,7 +429,6 @@ awful.screen.connect_for_each_screen(function(s)
         spacing = 12,
     }
 
-    -- Правая часть (часы, макет, громкость)
     local right_box = wibox.widget {
         clock_widget,
         layout_text_widget,
@@ -459,7 +437,6 @@ awful.screen.connect_for_each_screen(function(s)
         spacing = 8,
     }
 
-    -- Панель
     s.mywibox = awful.wibar({
         position = "bottom",
         screen = s,
@@ -474,28 +451,60 @@ awful.screen.connect_for_each_screen(function(s)
         stretch = true,
     })
 
-    -- Размещение: левая часть, пустой центр, правая часть
     s.mywibox:setup {
         layout = wibox.layout.align.horizontal,
         left_box,
-        nil,   -- центральный виджет отсутствует
+        nil,  
         right_box,
     }
-end)
--- }}}
 
--- {{{ Mouse bindings
+
+client.connect_signal("property::maximized", function(c)
+    if c.screen == s then
+        s.mywibox.visible = not c.maximized
+    end
+end)
+
+client.connect_signal("unmanage", function(c)
+    if c.screen == s then
+
+        local has_maximized = false
+        for _, cl in ipairs(s.clients) do
+            if cl.maximized then
+                has_maximized = true
+                break
+            end
+        end
+        if not has_maximized then
+            s.mywibox.visible = true
+        end
+    end
+end)
+
+
+tag.connect_signal("property::selected", function(t)
+    if t.screen == s then
+        local has_maximized = false
+        for _, c in ipairs(t:clients()) do
+            if c.maximized then
+                has_maximized = true
+                break
+            end
+        end
+        s.mywibox.visible = not has_maximized
+    end
+end)
+
+end)
+
 root.buttons(gears.table.join(
     awful.button({ }, 3, function () mymainmenu:toggle() end),
     awful.button({ }, 4, awful.tag.viewnext),
     awful.button({ }, 5, awful.tag.viewprev)
 ))
--- }}}
 
--- {{{ Key bindings
 globalkeys = gears.table.join(
 
-	    -- ★★★ ИЗМЕНЕНИЕ РАЗМЕРА FLOAT ОКОН С КЛАВИАТУРЫ ★★★
     awful.key({ modkey, "Shift" }, "Left", function()
         local c = client.focus
         if c then
@@ -746,9 +755,7 @@ clientbuttons = gears.table.join(
 )
 
 root.keys(globalkeys)
--- }}}
 
--- {{{ Rules
 awful.rules.rules = {
     { rule = { },
       properties = { border_width = beautiful.border_width,
@@ -770,9 +777,7 @@ awful.rules.rules = {
       }, properties = { floating = true } },
     { rule_any = {type = { "normal", "dialog" } }, properties = { titlebars_enabled = false } }
 }
--- }}}
 
--- {{{ Signals
 client.connect_signal("manage", function (c)
     if awesome.startup and not c.size_hints.user_position and not c.size_hints.program_position then
         awful.placement.no_offscreen(c)
@@ -806,4 +811,4 @@ end)
 
 client.connect_signal("focus", function(c) c.border_color = beautiful.border_focus end)
 client.connect_signal("unfocus", function(c) c.border_color = beautiful.border_normal end)
--- }}}
+
