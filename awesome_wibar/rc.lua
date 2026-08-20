@@ -24,7 +24,7 @@ local modkey = "Mod4"
 
 -- ===== АВТОЗАПУСК =====
 awful.spawn("picom -b")
-awful.spawn("conky -c /home/mark/.config/conky/conky.conf")
+
 
 -- ===== ОБРАБОТКА ОШИБОК =====
 if awesome.startup_errors then
