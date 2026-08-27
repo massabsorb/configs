@@ -17,6 +17,7 @@ local APPS = {
     editor = os.getenv("EDITOR") or "nano",
     launcher = "rofi -show drun -theme ~/.config/rofi/config.rasi",
     volume_control = "pavucontrol",
+    emoji = "rofi -modi emoji -show emoji",
 }
 
 APPS.editor_cmd = APPS.terminal .. " -e " .. APPS.editor
@@ -24,7 +25,7 @@ local modkey = "Mod4"
 
 -- ===== АВТОЗАПУСК =====
 awful.spawn("picom -b")
-
+awful.spawn("conky -c /home/mark/.config/conky/conky.conf")
 
 -- ===== ОБРАБОТКА ОШИБОК =====
 if awesome.startup_errors then
@@ -60,60 +61,73 @@ beautiful.bg_focus      = "#000000"
 beautiful.bg_urgent     = "#000000"
 beautiful.bg_minimize   = "#000000"
 beautiful.fg_normal     = "#ffffff"
-beautiful.fg_focus      = "#fff8cb"
+beautiful.fg_focus      = "#ffffff" --"#fff8cb"
 beautiful.fg_urgent     = "#ff5555"
-beautiful.border_width  = 2
+beautiful.border_width  = 1
 beautiful.border_color  = "#393869"
-beautiful.tag_color     = "#D92639"
-beautiful.tag_active    = "#00ff00"
+beautiful.border_normal = "#000000" --"#393869"
+beautiful.border_focus  = "#fff8cb"
+beautiful.tag_color     = "#0000FF" --"#D92639"
+beautiful.tag_active    = "#FFFF00" --"#00ff00"
 
 -- ===== РАСКЛАДКИ =====
 awful.layout.layouts = {
     awful.layout.suit.floating,
 }
 
+
 -- ===== ИКОНКИ ТЕГОВ =====
-local tags_icons = {
-    [1] = "󰬺", [2] = "󰬻", [3] = "󰬼", [4] = "󰬽", [5] = "󰬾",
-    [6] = "󰬿", [7] = "󰭀", [8] = "󰭁", [9] = "󰭂",
+--local tags_icons = {
+ --   [1] = "1", [2] = "2", [3] = "3", [4] = "4", [5] = "5",
+  --  [6] = "6", [7] = "7", [8] = "8", [9] = "9",
+--}
+
+-- Разделитель
+local small_separator = wibox.widget {
+    widget = wibox.container.margin,
+    top = 10,
+    bottom = 10,
 }
-
--- ===== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====
-local function create_icon_textbox(icon, color, font)
-    return wibox.widget {
-        markup = string.format('<span font="%s" foreground="%s">%s</span>', font or beautiful.icon_font, color, icon),
-        widget = wibox.widget.textbox,
-    }
-end
-
-local function is_floating_client(c)
-    return c and (c.floating or (c.first_tag and c.first_tag.layout == awful.layout.suit.floating))
-end
-
 -- ===== ВИДЖЕТ ТЕГОВ =====
 local function create_tag_widget(s)
     local container = wibox.widget {
-        layout = wibox.layout.fixed.horizontal,
+        layout = wibox.layout.fixed.vertical,
         spacing = 8,
     }
-    
+
+    -- Иконки для разных состояний
+    local icons = {
+        active = "󰈈",      -- активный тег
+        occupied = "󰛨",   -- тег с запущенными программами
+        empty = "",       -- пустой тег
+        urgent = "󰚯",      -- срочный тег
+    }
+
     local function update_tags()
         container:reset()
         for i, tag in ipairs(s.tags) do
-            local icon = tags_icons[i] or "󰊠"
+            local icon
             local color
             
             if tag == s.selected_tag then
+                icon = icons.active
                 color = beautiful.fg_focus
             elseif #tag:clients() > 0 then
+                icon = icons.occupied
                 color = beautiful.tag_active
             elseif tag.urgent then
+                icon = icons.urgent
                 color = beautiful.fg_urgent
             else
+                icon = icons.empty
                 color = beautiful.tag_color
             end
             
-            local textbox = create_icon_textbox(icon, color)
+            local textbox = wibox.widget.textbox()
+            textbox.font = beautiful.icon_font  -- Используем Nerd Font
+            textbox:set_markup(string.format('<span foreground="%s">%s</span>',
+                color, icon))
+            
             textbox:buttons(gears.table.join(
                 awful.button({}, 1, function() tag:view_only() end),
                 awful.button({modkey}, 1, function()
@@ -130,22 +144,33 @@ local function create_tag_widget(s)
             container:add(textbox)
         end
     end
-    
-    -- Подписка на обновления
+
     tag.connect_signal("property::selected", update_tags)
     tag.connect_signal("property::urgent", update_tags)
     client.connect_signal("tagged", update_tags)
     client.connect_signal("untagged", update_tags)
     client.connect_signal("unmanage", update_tags)
-    
+
     update_tags()
     return container
 end
+-- ===== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====
+local function create_icon_textbox(icon, color, font)
+    return wibox.widget {
+        markup = string.format('<span font="%s" foreground="%s">%s</span>', font or beautiful.icon_font, color, icon),
+        widget = wibox.widget.textbox,
+    }
+end
+
+local function is_floating_client(c)
+    return c and (c.floating or (c.first_tag and c.first_tag.layout == awful.layout.suit.floating))
+end
+
 
 -- ===== ВИДЖЕТ ИКОНОК ЗАДАЧ =====
 local function create_task_icons_widget(s)
     local container = wibox.widget {
-        layout = wibox.layout.fixed.horizontal,
+        layout = wibox.layout.fixed.vertical,
         spacing = 8,
     }
 
@@ -161,14 +186,14 @@ local function create_task_icons_widget(s)
                 icon_widget = wibox.widget {
                     image = c.icon,
                     resize = true,
-                    forced_width = 24,
-                    forced_height = 24,
+                    forced_width = 32,
+                    forced_height = 32,
                     widget = wibox.widget.imagebox
                 }
             else
                 local first_letter = string.sub(c.name or "?", 1, 1)
                 icon_widget = wibox.widget {
-                    markup = '<span font="JetBrains Mono 14">' .. first_letter .. '</span>',
+                    markup = '<span font="JetBrains Mono">' .. first_letter .. '</span>',
                     widget = wibox.widget.textbox
                 }
             end
@@ -207,6 +232,10 @@ local function create_task_icons_widget(s)
     client.connect_signal("property::visible", function(c)
         if c.screen == s then update_task_icons() end
     end)
+    
+    client.connect_signal("property::icon", function(c)
+        if c.screen == s then update_task_icons() end
+    end)
 
     update_task_icons()
     return container
@@ -226,13 +255,13 @@ local volume_widget = wibox.widget {
         widget = wibox.widget.textbox,
         markup = '<span font="' .. beautiful.icon_font .. '">󰕾</span>',
     },
-    layout = wibox.layout.fixed.horizontal,
+    layout = wibox.layout.fixed.vertical,
 }
 
 local function get_volume_icon(volume_percent, muted)
     if muted then return "󰝟" end
-    if volume_percent < 33 then return "󰕿" end
-    if volume_percent < 66 then return "󰖀" end
+    if volume_percent < 33 then return "󰖀" end
+    if volume_percent < 66 then return "󰕾" end
     return "󰕾"
 end
 
@@ -291,6 +320,69 @@ gears.timer {
     callback = update_volume_icon,
 }
 
+-- ===== ВИДЖЕТ БАТАРЕИ =====
+local battery_widget = wibox.widget {
+    {
+        id = "icon",
+        widget = wibox.widget.textbox,
+        markup = '<span font="' .. beautiful.icon_font .. '">󰁹</span>',
+    },
+    layout = wibox.layout.fixed.vertical,
+}
+
+local function get_battery_icon(percent, charging)
+    if charging then return "󰂄" end
+    if percent <= 10 then return "󰁺" end
+    if percent <= 25 then return "󰁻" end
+    if percent <= 50 then return "󰁾" end
+    if percent <= 75 then return "󰂀" end
+    return "󰁹"
+end
+
+local function update_battery_widget()
+    awful.spawn.easy_async_with_shell(
+        "cat /sys/class/power_supply/BATT/capacity 2>/dev/null || cat /sys/class/power_supply/BAT1/capacity 2>/dev/null || echo '0'",
+        function(stdout)
+            local percent = tonumber(stdout:match("%d+")) or 0
+
+            awful.spawn.easy_async_with_shell(
+                "cat /sys/class/power_supply/BATT/status 2>/dev/null || cat /sys/class/power_supply/BAT1/status 2>/dev/null || echo 'Unknown'",
+                function(status_out)
+                    local charging = status_out:match("Charging") ~= nil
+                    local icon = get_battery_icon(percent, charging)
+                    local color = "#ffffff"
+
+                    if percent <= 10 and not charging then
+                        color = beautiful.fg_urgent
+                    elseif percent <= 25 and not charging then
+                        color = "#ffaa00"
+                    elseif charging then
+                        color = "#00ff00"
+                    end
+
+                    battery_widget.icon.markup = string.format(
+                        '<span font="%s" foreground="%s">%s %d%%</span>',
+                        beautiful.icon_font, color, icon, percent
+                    )
+                end
+            )
+        end
+    )
+end
+
+gears.timer {
+    timeout = 30,
+    call_now = true,
+    autostart = true,
+    callback = update_battery_widget,
+}
+
+battery_widget:buttons(gears.table.join(
+    awful.button({}, 1, function()
+        awful.spawn("xfce4-power-manager-settings", false)
+    end)
+))
+
 -- ===== ВИДЖЕТ РАСКЛАДКИ =====
 local layout_text_widget = wibox.widget.textbox()
 layout_text_widget.font = beautiful.font
@@ -299,7 +391,7 @@ local function update_layout_widget(s)
     local tag = s.selected_tag
     if tag then
         local layout_names = {
-            [awful.layout.suit.floating] = "FLOAT",
+            [awful.layout.suit.floating] = "",
         }
         local name = layout_names[tag.layout] or "?"
         layout_text_widget.markup = '<span foreground="#ffffff">' .. name .. '</span>'
@@ -320,12 +412,13 @@ end)
 local clock_widget = wibox.widget.textbox()
 clock_widget.font = beautiful.font
 
-local months = { "янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек" }
-local weekdays = { "Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб" }
+local months = { "⛄янв", "🥶фев", "💧мар", "🌞апр", "🌷май", "😎июн", "🥵июл", "🫠авг", "😊сен", "🌧️окт", "🧥ноя", "❄️дек" }
+
+local weekdays = { "🥲Вс", "😐Пн", "😑Вт", "🫣Ср", "🙂Чт", "😊Пт", "😍Сб" }
 
 local function update_clock()
     local now = os.date("*t")
-    local date_str = string.format("%s %02d %s %02d:%02d:%02d",
+    local date_str = string.format("%s %02d %s 󰥔 %02d %02d %02d",
         weekdays[now.wday], now.day, months[now.month],
         now.hour, now.min, now.sec
     )
@@ -369,25 +462,32 @@ awful.screen.connect_for_each_screen(function(s)
     local tag_widget = create_tag_widget(s)
     local task_icons_widget = create_task_icons_widget(s)
 
-    local left_box = wibox.widget {
+    -- Верхняя часть панели (теги и задачи)
+    local top_box = wibox.widget {
         tag_widget,
-        task_icons_widget,
-        layout = wibox.layout.fixed.horizontal,
+        separator,
+	task_icons_widget,
+        separator,
+	layout = wibox.layout.fixed.vertical,
         spacing = 12,
     }
 
-    local right_box = wibox.widget {
+    -- Нижняя часть панели (часы, раскладка, громкость)
+    local bottom_box = wibox.widget {
+	    	    
         clock_widget,
         layout_text_widget,
         volume_widget,
-        layout = wibox.layout.fixed.horizontal,
+	battery_widget,
+        layout = wibox.layout.fixed.vertical,
         spacing = 8,
-    }
+	}
+   
 
     s.mywibox = awful.wibar({
-        position = "bottom",
+        position = "left",
         screen = s,
-        height = 34,
+        width = 34,
         bg = beautiful.bg_normal,
         fg = beautiful.fg_normal,
         border_width = beautiful.border_width,
@@ -399,10 +499,10 @@ awful.screen.connect_for_each_screen(function(s)
     })
 
     s.mywibox:setup {
-        layout = wibox.layout.align.horizontal,
-        left_box,
+        layout = wibox.layout.align.vertical,
+        top_box,
         nil,
-        right_box,
+        bottom_box,
     }
 
     -- Автоматическое скрытие панели
@@ -512,6 +612,8 @@ globalkeys = gears.table.join(
               {description = "go back", group = "tag"}),
     awful.key({modkey}, "p", function() awful.spawn(APPS.launcher) end,
               {description = "run launcher", group = "launcher"}),
+    awful.key({modkey}, "e", function() awful.spawn(APPS.emoji) end,
+              {description = "emoji picker", group = "launcher"}),
     awful.key({modkey}, "j", function() awful.client.focus.byidx(1) end,
               {description = "focus next by index", group = "client"}),
     awful.key({modkey}, "k", function() awful.client.focus.byidx(-1) end,
