@@ -52,8 +52,8 @@ end
 
 -- ===== ТЕМА =====
 beautiful.init(gears.filesystem.get_configuration_dir() .. "theme.lua")
-beautiful.font = "Fira Code Retina 12"
-beautiful.icon_font = beautiful.icon_font or "Symbols Nerd Font Mono 13"
+beautiful.font = "Fira Code Retina 13"
+beautiful.icon_font = beautiful.icon_font or "Symbols Nerd Font Mono 20"
 
 -- Цветовая схема
 beautiful.bg_normal     = "#000000"
@@ -61,26 +61,28 @@ beautiful.bg_focus      = "#000000"
 beautiful.bg_urgent     = "#000000"
 beautiful.bg_minimize   = "#000000"
 beautiful.fg_normal     = "#ffffff"
-beautiful.fg_focus      = "#ffffff" --"#fff8cb"
+beautiful.fg_focus      = "#ffffff"
 beautiful.fg_urgent     = "#ff5555"
 beautiful.border_width  = 1
 beautiful.border_color  = "#393869"
-beautiful.border_normal = "#000000" --"#393869"
+beautiful.border_normal = "#000000"
 beautiful.border_focus  = "#fff8cb"
-beautiful.tag_color     = "#0000FF" --"#D92639"
-beautiful.tag_active    = "#FFFF00" --"#00ff00"
+beautiful.tag_color     = "#0000FF"
+beautiful.tag_active    = "#FFFF00"
+
+    -- Настройка всплывающего меню
+beautiful.menu_width = 300  -- ширина меню
+beautiful.menu_height = 30  -- высота пункта меню
+beautiful.menu_font = beautiful.font
+beautiful.menu_bg_normal = beautiful.bg_normal
+beautiful.menu_fg_normal = beautiful.fg_normal
+beautiful.menu_border_width = 2
+beautiful.menu_border_color = beautiful.border_focus
 
 -- ===== РАСКЛАДКИ =====
 awful.layout.layouts = {
     awful.layout.suit.floating,
 }
-
-
--- ===== ИКОНКИ ТЕГОВ =====
---local tags_icons = {
- --   [1] = "1", [2] = "2", [3] = "3", [4] = "4", [5] = "5",
-  --  [6] = "6", [7] = "7", [8] = "8", [9] = "9",
---}
 
 -- Разделитель
 local small_separator = wibox.widget {
@@ -88,19 +90,19 @@ local small_separator = wibox.widget {
     top = 10,
     bottom = 10,
 }
+
 -- ===== ВИДЖЕТ ТЕГОВ =====
 local function create_tag_widget(s)
     local container = wibox.widget {
-        layout = wibox.layout.fixed.vertical,
+        layout = wibox.layout.fixed.horizontal,
         spacing = 8,
     }
 
-    -- Иконки для разных состояний
     local icons = {
-        active = "󰈈",      -- активный тег
-        occupied = "󰛨",   -- тег с запущенными программами
-        empty = "",       -- пустой тег
-        urgent = "󰚯",      -- срочный тег
+        active = "󰈈",
+        occupied = "󰛨",
+        empty = "",
+        urgent = "󰚯",
     }
 
     local function update_tags()
@@ -124,7 +126,7 @@ local function create_tag_widget(s)
             end
             
             local textbox = wibox.widget.textbox()
-            textbox.font = beautiful.icon_font  -- Используем Nerd Font
+            textbox.font = beautiful.icon_font
             textbox:set_markup(string.format('<span foreground="%s">%s</span>',
                 color, icon))
             
@@ -154,6 +156,7 @@ local function create_tag_widget(s)
     update_tags()
     return container
 end
+
 -- ===== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ =====
 local function create_icon_textbox(icon, color, font)
     return wibox.widget {
@@ -166,11 +169,10 @@ local function is_floating_client(c)
     return c and (c.floating or (c.first_tag and c.first_tag.layout == awful.layout.suit.floating))
 end
 
-
 -- ===== ВИДЖЕТ ИКОНОК ЗАДАЧ =====
 local function create_task_icons_widget(s)
     local container = wibox.widget {
-        layout = wibox.layout.fixed.vertical,
+        layout = wibox.layout.fixed.horizontal,
         spacing = 8,
     }
 
@@ -208,7 +210,6 @@ local function create_task_icons_widget(s)
         end
     end
 
-    -- Подписка на обновления
     tag.connect_signal("property::selected", function(t)
         if t.screen == s then update_task_icons() end
     end)
@@ -241,7 +242,7 @@ local function create_task_icons_widget(s)
     return container
 end
 
--- ===== ВИДЖЕТ ГРОМКОСТИ =====
+-- ===== ВИДЖЕТ ГРОМКОСТИ (для правой панели) =====
 local volume_backend = (function()
     local handle = io.popen("command -v wpctl")
     local result = handle:read("*a")
@@ -274,26 +275,12 @@ local function update_volume_icon()
             local icon = get_volume_icon(volume_percent, muted)
             volume_widget.icon.markup = '<span font="' .. beautiful.icon_font .. '">' .. icon .. '</span>'
         end)
-    else
-        awful.spawn.easy_async(
-            "sh -c 'pactl get-sink-mute @DEFAULT_SINK@ && pactl get-sink-volume @DEFAULT_SINK@ | grep -oP \"\\d+%\" | head -1'",
-            function(stdout)
-                local mute, percent = stdout:match("(.+)\n(.+)")
-                percent = percent and tonumber(percent:match("(%d+)")) or 0
-                local muted = mute and mute:match("Mute: yes") ~= nil
-                local icon = get_volume_icon(percent, muted)
-                volume_widget.icon.markup = '<span font="' .. beautiful.icon_font .. '">' .. icon .. '</span>'
-            end
-        )
     end
 end
 
 local function change_volume(delta)
     if volume_backend == "wpctl" then
         awful.spawn(string.format("wpctl set-volume @DEFAULT_AUDIO_SINK@ %d%%", delta), false)
-    else
-        local sign = delta >= 0 and "+" or ""
-        awful.spawn(string.format("pactl set-sink-volume @DEFAULT_SINK@ %s%d%%", sign, delta), false)
     end
     update_volume_icon()
 end
@@ -320,7 +307,7 @@ gears.timer {
     callback = update_volume_icon,
 }
 
--- ===== ВИДЖЕТ БАТАРЕИ =====
+-- ===== ВИДЖЕТ БАТАРЕИ (для правой панели) =====
 local battery_widget = wibox.widget {
     {
         id = "icon",
@@ -341,12 +328,22 @@ end
 
 local function update_battery_widget()
     awful.spawn.easy_async_with_shell(
-        "cat /sys/class/power_supply/BATT/capacity 2>/dev/null || cat /sys/class/power_supply/BAT1/capacity 2>/dev/null || echo '0'",
+        "cat /sys/class/power_supply/BATT/capacity 2>/dev/null || cat /sys/class/power_supply/BAT1/capacity 2>/dev/null || cat /sys/class/power_supply/BAT0/capacity 2>/dev/null || echo 'NOT_FOUND'",
         function(stdout)
-            local percent = tonumber(stdout:match("%d+")) or 0
+            local percent_str = stdout:match("%d+")
+            
+            if not percent_str then
+                battery_widget.icon.markup = string.format(
+                    '<span font="%s" foreground="#ffffff">󱄇</span>',
+                    beautiful.icon_font
+                )
+                return
+            end
+            
+            local percent = tonumber(percent_str) or 0
 
             awful.spawn.easy_async_with_shell(
-                "cat /sys/class/power_supply/BATT/status 2>/dev/null || cat /sys/class/power_supply/BAT1/status 2>/dev/null || echo 'Unknown'",
+                "cat /sys/class/power_supply/BATT/status 2>/dev/null || cat /sys/class/power_supply/BAT1/status 2>/dev/null || cat /sys/class/power_supply/BAT0/status 2>/dev/null || echo 'Unknown'",
                 function(status_out)
                     local charging = status_out:match("Charging") ~= nil
                     local icon = get_battery_icon(percent, charging)
@@ -376,12 +373,6 @@ gears.timer {
     autostart = true,
     callback = update_battery_widget,
 }
-
-battery_widget:buttons(gears.table.join(
-    awful.button({}, 1, function()
-        awful.spawn("xfce4-power-manager-settings", false)
-    end)
-))
 
 -- ===== ВИДЖЕТ РАСКЛАДКИ =====
 local layout_text_widget = wibox.widget.textbox()
@@ -418,7 +409,7 @@ local weekdays = { "🥲Вс", "😐Пн", "😑Вт", "🫣Ср", "🙂Чт", "
 
 local function update_clock()
     local now = os.date("*t")
-    local date_str = string.format("%s %02d %s 󰥔 %02d %02d %02d",
+    local date_str = string.format("%s %02d %s 󰥔 %02d:%02d ",
         weekdays[now.wday], now.day, months[now.month],
         now.hour, now.min, now.sec
     )
@@ -430,6 +421,152 @@ gears.timer {
     call_now = true,
     autostart = true,
     callback = update_clock,
+}
+
+-- ===== СИСТЕМНЫЕ ВИДЖЕТЫ ДЛЯ ПРАВОЙ ПАНЕЛИ =====
+
+-- Температура
+local temp_widget = wibox.widget {
+    {
+        id = "icon",
+        widget = wibox.widget.textbox,
+        markup = '<span font="' .. beautiful.icon_font .. '">󰔏</span>',
+    },
+    layout = wibox.layout.fixed.horizontal,
+}
+
+local function update_temp_widget()
+    awful.spawn.easy_async_with_shell(
+        "for hwmon in /sys/class/hwmon/hwmon*; do if [ -f \"$hwmon/name\" ] && grep -q 'k10temp' \"$hwmon/name\"; then cat \"$hwmon/temp1_input\"; break; fi; done 2>/dev/null | awk '{print $1/1000}' || echo '0'",
+        function(stdout)
+            local temp = tonumber(stdout:match("%d+%.?%d*")) or 0
+            local color = "#ffffff"
+            if temp > 80 then
+                color = beautiful.fg_urgent
+            elseif temp > 60 then
+                color = "#ffaa00"
+            end
+            temp_widget.icon.markup = string.format(
+                '<span font="%s" foreground="%s">󰔏 %.0f°C</span>',
+                beautiful.icon_font, color, temp
+            )
+        end
+    )
+end
+
+gears.timer {
+    timeout = 5,
+    call_now = true,
+    autostart = true,
+    callback = update_temp_widget,
+}
+
+-- Нагрузка на процессор
+local cpu_widget = wibox.widget {
+    {
+        id = "icon",
+        widget = wibox.widget.textbox,
+        markup = '<span font="' .. beautiful.icon_font .. '">󰻠</span>',
+    },
+    layout = wibox.layout.fixed.horizontal,
+}
+
+local function update_cpu_widget()
+    awful.spawn.easy_async_with_shell(
+        "top -bn1 | grep 'Cpu(s)' | awk '{print $2+$4}'",
+        function(stdout)
+            local cpu = tonumber(stdout:match("%d+%.?%d*")) or 0
+            local color = "#ffffff"
+            if cpu > 80 then
+                color = beautiful.fg_urgent
+            elseif cpu > 60 then
+                color = "#ffaa00"
+            end
+            cpu_widget.icon.markup = string.format(
+                '<span font="%s" foreground="%s">󰻠 %.0f%%</span>',
+                beautiful.icon_font, color, cpu
+            )
+        end
+    )
+end
+
+gears.timer {
+    timeout = 2,
+    call_now = true,
+    autostart = true,
+    callback = update_cpu_widget,
+}
+
+-- ОЗУ
+local ram_widget = wibox.widget {
+    {
+        id = "icon",
+        widget = wibox.widget.textbox,
+        markup = '<span font="' .. beautiful.icon_font .. '">󰍛</span>',
+    },
+    layout = wibox.layout.fixed.horizontal,
+}
+
+local function update_ram_widget()
+    awful.spawn.easy_async_with_shell(
+        "free -m | awk '/^Mem:/ {printf \"%.0f\", ($3/$2)*100}'",
+        function(stdout)
+            local ram = tonumber(stdout:match("%d+")) or 0
+            local color = "#ffffff"
+            if ram > 80 then
+                color = beautiful.fg_urgent
+            elseif ram > 60 then
+                color = "#ffaa00"
+            end
+            ram_widget.icon.markup = string.format(
+                '<span font="%s" foreground="%s">󰍛 %.0f%%</span>',
+                beautiful.icon_font, color, ram
+            )
+        end
+    )
+end
+
+gears.timer {
+    timeout = 5,
+    call_now = true,
+    autostart = true,
+    callback = update_ram_widget,
+}
+
+-- Место на диске
+local disk_widget = wibox.widget {
+    {
+        id = "icon",
+        widget = wibox.widget.textbox,
+        markup = '<span font="' .. beautiful.icon_font .. '">󰋊</span>',
+    },
+    layout = wibox.layout.fixed.horizontal,
+}
+
+local function update_disk_widget()
+    awful.spawn.easy_async_with_shell(
+        "df -h / | awk 'NR==2 {print $5}' | sed 's/%//'",
+        function(stdout)
+            local disk = tonumber(stdout:match("%d+")) or 0
+            local color = "#ffffff"
+            if disk > 90 then
+                color = beautiful.fg_urgent
+            elseif disk > 75 then
+                color = "#ffaa00"
+            end
+            disk_widget.icon.markup = string.format(
+                '<span font="%s" foreground="%s">󰋊 %.0f%%</span>',
+                beautiful.icon_font, color, disk
+            )
+        end
+    )
+end
+
+gears.timer {
+    timeout = 30,
+    call_now = true,
+    autostart = true,
+    callback = update_disk_widget,
 }
 
 -- ===== ОБОИ =====
@@ -444,6 +581,7 @@ local function set_wallpaper(s)
 end
 
 screen.connect_signal("property::geometry", set_wallpaper)
+
 
 -- ===== НАСТРОЙКА ЭКРАНОВ =====
 awful.screen.connect_for_each_screen(function(s)
@@ -462,50 +600,191 @@ awful.screen.connect_for_each_screen(function(s)
     local tag_widget = create_tag_widget(s)
     local task_icons_widget = create_task_icons_widget(s)
 
-    -- Верхняя часть панели (теги и задачи)
-    local top_box = wibox.widget {
-        tag_widget,
-        separator,
-	task_icons_widget,
-        separator,
-	layout = wibox.layout.fixed.vertical,
-        spacing = 12,
+    local logo_widget = wibox.widget {
+        markup = '<span font="' .. beautiful.icon_font .. '" foreground="#ffffff">󰣇</span>',
+        widget = wibox.widget.textbox,
     }
 
-    -- Нижняя часть панели (часы, раскладка, громкость)
-    local bottom_box = wibox.widget {
-	    	    
-        clock_widget,
-        layout_text_widget,
-        volume_widget,
-	battery_widget,
-        layout = wibox.layout.fixed.vertical,
-        spacing = 8,
-	}
-   
+        -- ===== ПАНЕЛЬ С ЛОГОТИПОМ =====
+    -- Меню с программами
+    mainmenu = awful.menu({
+        items = {
+            { " Firefox", function() mainmenu:hide() awful.spawn("firefox") end },
+            { " Thunar", function() mainmenu:hide() awful.spawn("thunar") end },
+            { " Terminal", function() mainmenu:hide(); awful.spawn(APPS.terminal) end },
+            { " Editor", function() mainmenu:hide(); awful.spawn(APPS.editor_cmd) end },
+            { "󱓞 Launcher", function() mainmenu:hide() gears.timer.start_new(0.1, function() awful.spawn(APPS.launcher) return false end) end},
+            { " Volume Control", function() mainmenu:hide(); awful.spawn(APPS.volume_control) end },
+	    { "󰧱 Appearance", function() mainmenu:hide(); awful.spawn("lxappearance") end }, 
+            { "------------------", nil },
+            { " Restart Awesome", function() mainmenu:hide(); awesome.restart() end },
+            { " Quit Awesome", function() mainmenu:hide(); awesome.quit() end },
+        }
+    })
 
-    s.mywibox = awful.wibar({
-        position = "left",
-        screen = s,
-        width = 34,
+        mainmenu:connect_signal("mouse::leave", function()
+        mainmenu:hide()
+    end)
+
+    -- Кликабельный логотип
+    local logo_widget = wibox.widget {
+        markup = '<span font="' .. beautiful.icon_font .. '" foreground="#ffffff">󰣇</span>',
+        widget = wibox.widget.textbox,
+    }
+
+    logo_widget:buttons(gears.table.join(
+        awful.button({}, 1, function()
+            mainmenu:toggle()  -- показать/скрыть меню
+        end)
+    ))
+
+    -- Панель с логотипом
+    s.logobar = wibox({
+        width = 40,
+        height = 40,
         bg = beautiful.bg_normal,
         fg = beautiful.fg_normal,
         border_width = beautiful.border_width,
         border_color = beautiful.border_color,
+        shape = gears.shape.rounded_rect,
         ontop = true,
-        cursor = "arrow",
         visible = true,
-        stretch = true,
+        x = 10,
+        y = 10,
+        screen = s,
+        type = "dock",
+    })
+
+    s.logobar:setup {
+        {
+            logo_widget,
+            left = 5,
+            right = 5,
+            top = 5,
+            bottom = 5,
+            widget = wibox.container.margin,
+        },
+        layout = wibox.layout.align.horizontal,
+    }
+    -- ===== ПАНЕЛЬ С ТЭГАМИ =====
+    s.mywibox = wibox({
+        width = 320, 
+        height = 40,
+        bg = beautiful.bg_normal,
+        fg = beautiful.fg_normal,
+        border_width = beautiful.border_width,
+        border_color = beautiful.border_color,
+        shape = gears.shape.rounded_rect,
+        ontop = true,
+        visible = true,
+	x = 60,
+        y = 10,
+        screen = s,
+        type = "dock",
     })
 
     s.mywibox:setup {
-        layout = wibox.layout.align.vertical,
-        top_box,
-        nil,
-        bottom_box,
+        {
+            tag_widget,
+            layout = wibox.layout.fixed.horizontal,
+            spacing = 10,
+        },
+	widget = wibox.container.place,
+        halign = "center",
+        valign = "center",
     }
 
-    -- Автоматическое скрытие панели
+    -- ===== ПАНЕЛЬ АКТИВНЫХ ПРОГРАММ =====
+    s.taskbar = wibox({
+        width = 300,  -- ширина панели задач
+        height = 40,
+        bg = beautiful.bg_normal,
+        fg = beautiful.fg_normal,
+        border_width = beautiful.border_width,
+        border_color = beautiful.border_color,
+        shape = gears.shape.rounded_rect,
+        ontop = true,
+        visible = true,
+        x = 400,
+        y = 10,
+        screen = s,
+        type = "dock",
+    })
+
+    s.taskbar:setup {
+        {
+            task_icons_widget,
+            layout = wibox.layout.fixed.horizontal,
+            spacing = 8,
+        },
+        widget = wibox.container.place,
+        halign = "center",
+        valign = "center",
+    }
+
+    -- ===== ПАНЕЛЬ С ЧАСАМИ =====
+    s.clockbar = wibox({
+        width = 250,
+        height = 40,
+        bg = beautiful.bg_normal,
+        fg = beautiful.fg_normal,
+        border_width = beautiful.border_width,
+        border_color = beautiful.border_color,
+        shape = gears.shape.rounded_rect,
+        ontop = true,
+        visible = true,
+        x = 1140,  
+        y = 10,
+        screen = s,
+        type = "dock",
+    })
+
+    s.clockbar:setup {
+        {
+            clock_widget,
+            layout_text_widget,
+            layout = wibox.layout.fixed.horizontal,
+            spacing = 10,
+        },
+        widget = wibox.container.place,
+        halign = "center",
+        valign = "center",
+    }
+
+    -- ===== ПРАВАЯ ПАНЕЛЬ (системные виджеты) =====
+    s.rightbar = wibox({
+        width = 500,
+        height = 40,
+        bg = beautiful.bg_normal,
+        fg = beautiful.fg_normal,
+        border_width = beautiful.border_width,
+        border_color = beautiful.border_color,
+        shape = gears.shape.rounded_rect,
+        ontop = true,
+        visible = true,
+        x = 1400,
+        y = 10,
+        screen = s,
+        type = "dock",
+    })
+
+    s.rightbar:setup {
+        {
+            cpu_widget,
+            ram_widget,
+            temp_widget,
+            disk_widget,
+            volume_widget,
+            battery_widget,
+            layout = wibox.layout.fixed.horizontal,
+            spacing = 15,
+        },
+        widget = wibox.container.place,
+        halign = "center",
+        valign = "center",
+    }
+
+    -- Автоматическое скрытие всех панелей при максимизации
     local function update_wibar_visibility()
         local has_maximized = false
         for _, c in ipairs(s.clients) do
@@ -514,32 +793,35 @@ awful.screen.connect_for_each_screen(function(s)
                 break
             end
         end
+        s.logobar.visible = not has_maximized  -- добавьте эту строку
         s.mywibox.visible = not has_maximized
+        s.taskbar.visible = not has_maximized
+        s.clockbar.visible = not has_maximized
+        s.rightbar.visible = not has_maximized
     end
 
     client.connect_signal("property::maximized", function(c)
         if c.screen == s then update_wibar_visibility() end
     end)
-    
+
     client.connect_signal("unmanage", function(c)
         if c.screen == s then update_wibar_visibility() end
     end)
-    
+
     tag.connect_signal("property::selected", function(t)
         if t.screen == s then update_wibar_visibility() end
     end)
 end)
-
 -- ===== КНОПКИ КОРНЕВОГО ОКНА =====
 root.buttons(gears.table.join(
-    awful.button({}, 3, function() mymainmenu:toggle() end),
+--    awful.button({}, 3, function() mymainmenu:toggle() end),
     awful.button({}, 4, awful.tag.viewnext),
     awful.button({}, 5, awful.tag.viewprev)
 ))
 
+
 -- ===== ГЛОБАЛЬНЫЕ КЛАВИШИ =====
 globalkeys = gears.table.join(
-    -- Управление размерами floating окон
     awful.key({modkey, "Shift"}, "Left", function()
         local c = client.focus
         if is_floating_client(c) then
@@ -572,7 +854,6 @@ globalkeys = gears.table.join(
         end
     end, {description = "увеличить высоту float окна", group = "client"}),
 
-    -- Перемещение floating окон
     awful.key({modkey, "Control"}, "Left", function()
         local c = client.focus
         if is_floating_client(c) then
@@ -601,7 +882,6 @@ globalkeys = gears.table.join(
         end
     end, {description = "переместить float окно вниз", group = "client"}),
 
-    -- Основные клавиши
     awful.key({modkey}, "s", hotkeys_popup.show_help,
               {description = "show help", group = "awesome"}),
     awful.key({modkey}, "Left", awful.tag.viewprev,
@@ -618,8 +898,8 @@ globalkeys = gears.table.join(
               {description = "focus next by index", group = "client"}),
     awful.key({modkey}, "k", function() awful.client.focus.byidx(-1) end,
               {description = "focus previous by index", group = "client"}),
-    awful.key({modkey}, "w", function() mymainmenu:show() end,
-              {description = "show main menu", group = "awesome"}),
+    --awful.key({modkey}, "w", function() mymainmenu:show() end,
+      --        {description = "show main menu", group = "awesome"}),
     awful.key({modkey, "Shift"}, "j", function() awful.client.swap.byidx(1) end,
               {description = "swap with next client by index", group = "client"}),
     awful.key({modkey, "Shift"}, "k", function() awful.client.swap.byidx(-1) end,
