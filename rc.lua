@@ -98,60 +98,95 @@ local function create_tag_widget(s)
         spacing = 8,
     }
 
-    local icons = {
-        active = "󰈈",
-        occupied = "󰛨",
-        empty = "",
-        urgent = "󰚯",
-    }
+    -- ЗАМЕНИТЕ на свои символы
+    local ICON_PULSE_A  = ""   -- первая иконка пульсации (активный)
+    local ICON_PULSE_B  = ""   -- вторая иконка пульсации
+    local ICON_OCCUPIED = ""   -- неактивный с окнами
+    local ICON_INACTIVE = ""   -- неактивный пустой
+    local ICON_URGENT   = "󰚯"
+
+    local COLOR_INACTIVE = "#ffffff"   -- белый — неактивный
+    local COLOR_ACTIVE   = "#00ff88"   -- зелёный — активный
+    local COLOR_OCCUPIED = "#ffcc00"   -- жёлтый — неактивный с окнами
+    local COLOR_URGENT   = "#ff5555"
+
+    local tag_boxes = {}
+    local pulse_state = false
 
     local function update_tags()
-        container:reset()
         for i, tag in ipairs(s.tags) do
-            local icon
-            local color
-            
-            if tag == s.selected_tag then
-                icon = icons.active
-                color = beautiful.fg_focus
-            elseif #tag:clients() > 0 then
-                icon = icons.occupied
-                color = beautiful.tag_active
-            elseif tag.urgent then
-                icon = icons.urgent
-                color = beautiful.fg_urgent
-            else
-                icon = icons.empty
-                color = beautiful.tag_color
+            local box = tag_boxes[i]
+            if box then
+                local icon, color
+
+                if tag == s.selected_tag then
+                    -- активный: зелёный, пульсирует
+                    icon  = pulse_state and ICON_PULSE_B or ICON_PULSE_A
+                    color = COLOR_ACTIVE
+                elseif tag.urgent then
+                    icon, color = ICON_URGENT, COLOR_URGENT
+                elseif #tag:clients() > 0 then
+                    -- неактивный с окнами: жёлтый, статичный
+                    icon, color = ICON_OCCUPIED, COLOR_OCCUPIED
+                else
+                    -- неактивный пустой: красный, статичный
+                    icon, color = ICON_INACTIVE, COLOR_INACTIVE
+                end
+
+                box.markup = string.format(
+                    '<span foreground="%s">%s</span>', color, icon)
             end
-            
-            local textbox = wibox.widget.textbox()
-            textbox.font = beautiful.icon_font
-            textbox:set_markup(string.format('<span foreground="%s">%s</span>',
-                color, icon))
-            
-            textbox:buttons(gears.table.join(
-                awful.button({}, 1, function() tag:view_only() end),
-                awful.button({modkey}, 1, function()
-                    if client.focus then client.focus:move_to_tag(tag) end
-                end),
-                awful.button({}, 3, function() awful.tag.viewtoggle(tag) end),
-                awful.button({modkey}, 3, function()
-                    if client.focus then client.focus:toggle_tag(tag) end
-                end),
-                awful.button({}, 4, function() awful.tag.viewnext(s) end),
-                awful.button({}, 5, function() awful.tag.viewprev(s) end)
-            ))
-            
-            container:add(textbox)
         end
     end
 
-    tag.connect_signal("property::selected", update_tags)
-    tag.connect_signal("property::urgent", update_tags)
-    client.connect_signal("tagged", update_tags)
-    client.connect_signal("untagged", update_tags)
-    client.connect_signal("unmanage", update_tags)
+    -- создаём textbox'ы один раз
+    for i, tag in ipairs(s.tags) do
+        local textbox = wibox.widget.textbox()
+        textbox.font = beautiful.icon_font
+        tag_boxes[i] = textbox
+
+        textbox:buttons(gears.table.join(
+            awful.button({}, 1, function() tag:view_only() end),
+            awful.button({modkey}, 1, function()
+                if client.focus then client.focus:move_to_tag(tag) end
+            end),
+            awful.button({}, 3, function() awful.tag.viewtoggle(tag) end),
+            awful.button({modkey}, 3, function()
+                if client.focus then client.focus:toggle_tag(tag) end
+            end),
+            awful.button({}, 4, function() awful.tag.viewnext(s) end),
+            awful.button({}, 5, function() awful.tag.viewprev(s) end)
+        ))
+
+        container:add(textbox)
+    end
+
+    -- таймер пульсации: переключает иконку только у активного тега
+    gears.timer {
+        timeout = 1,
+        autostart = true,
+        callback = function()
+            pulse_state = not pulse_state
+            update_tags()
+        end,
+    }
+
+    -- сигналы
+    tag.connect_signal("property::selected", function(t)
+        if t.screen == s then update_tags() end
+    end)
+    tag.connect_signal("property::urgent", function(t)
+        if t.screen == s then update_tags() end
+    end)
+    client.connect_signal("tagged", function(c)
+        if c.screen == s then update_tags() end
+    end)
+    client.connect_signal("untagged", function(c)
+        if c.screen == s then update_tags() end
+    end)
+    client.connect_signal("unmanage", function(c)
+        if c.screen == s then update_tags() end
+    end)
 
     update_tags()
     return container
@@ -662,7 +697,7 @@ function set_keyboard_layout(layout)
 
     naughty.notify({
         preset = naughty.config.presets.normal,
-        title = "⌨️KKeyboard layout",
+        title = "⌨️Keyboard layout",
         text = flag .. "  " .. name,
         timeout = 3.0,
         width = 300,
@@ -822,7 +857,7 @@ awful.screen.connect_for_each_screen(function(s)
         height = 40,
         bg = beautiful.bg_normal,
         fg = beautiful.fg_normal,
-        border_width = 3,
+        border_width = 2,
         border_color = "#2B54F6",
         shape = gears.shape.rounded_rect,
         ontop = true,
@@ -850,7 +885,7 @@ awful.screen.connect_for_each_screen(function(s)
         height = 40,
         bg = beautiful.bg_normal,
         fg = beautiful.fg_normal,
-        border_width = 3,
+        border_width = 2,
         border_color = "#2B54F6",
         shape = gears.shape.rounded_rect,
         ontop = true,
@@ -879,7 +914,7 @@ awful.screen.connect_for_each_screen(function(s)
         height = 40,
         bg = beautiful.bg_normal,
         fg = beautiful.fg_normal,
-        border_width = 3,
+        border_width = 2,
         border_color = "#2B54F6",
         shape = gears.shape.rounded_rect,
         ontop = true,
