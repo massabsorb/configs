@@ -66,7 +66,7 @@ beautiful.fg_urgent     = "#ff5555"
 beautiful.border_width  = 1
 beautiful.border_color  = "#393869"
 beautiful.border_normal = "#000000"
-beautiful.border_focus  = "#fff8cb"
+beautiful.border_focus  = "#2B54F6"
 beautiful.tag_color     = "#0000FF"
 beautiful.tag_active    = "#FFFF00"
 
@@ -169,21 +169,134 @@ local function is_floating_client(c)
     return c and (c.floating or (c.first_tag and c.first_tag.layout == awful.layout.suit.floating))
 end
 
--- ===== ВИДЖЕТ ИКОНОК ЗАДАЧ =====
+
+-- ===== ВИДЖЕТ ИКОНОК ЗАДАЧ + ЗМЕЙКА С ХВОСТОМ =====
 local function create_task_icons_widget(s)
     local container = wibox.widget {
         layout = wibox.layout.fixed.horizontal,
         spacing = 8,
     }
 
+    -- ---- Настройки змейки ----
+    local SNAKE_LEN     = 12        -- длина дорожки в символах
+    local SNAKE_TICK    = 200       -- мс между кадрами (меньше = быстрее)
+    local TAIL_LEN      = 6         -- длина видимого хвоста (в символах)
+    local BODY_CHAR     = "●"
+    local HEAD_CHAR     = "◉"
+    local EMPTY_CHAR    = "·"
+    local EMPTY_COLOR   = "#222222"
+    local HEAD_COLOR    = "#ffffff"
+    local BODY_COLOR    = "#00ff88"
+
+    local snake_widget = wibox.widget {
+        markup = "",
+        font = beautiful.icon_font,
+        align = "center",
+        valign = "center",
+        widget = wibox.widget.textbox,
+    }
+
+    local head_pos = 1              -- позиция головы (1..SNAKE_LEN)
+    local head_dir = 1              -- 1 = вправо, -1 = влево
+    local snake_timer = nil
+
+    -- плавное затухание: берём цвет головы и линейно уводим к EMPTY_COLOR
+    local function fade_color(t)
+        -- t: 0 = голова (ярко), 1 = конец хвоста (пусто)
+        -- возвращаем hex-цвет между BODY_COLOR и EMPTY_COLOR
+        local function hex2rgb(hex)
+            hex = hex:gsub("#", "")
+            return tonumber(hex:sub(1,2), 16),
+                   tonumber(hex:sub(3,4), 16),
+                   tonumber(hex:sub(5,6), 16)
+        end
+        local r1,g1,b1 = hex2rgb(BODY_COLOR)
+        local r2,g2,b2 = hex2rgb(EMPTY_COLOR)
+        local r = math.floor(r1 + (r2 - r1) * t + 0.5)
+        local g = math.floor(g1 + (g2 - g1) * t + 0.5)
+        local b = math.floor(b1 + (b2 - b1) * t + 0.5)
+        return string.format("#%02x%02x%02x", r, g, b)
+    end
+
+    local function render_snake()
+        local parts = {}
+        for i = 1, SNAKE_LEN do
+            -- dist: сколько символов назад от головы (0 = голова)
+            local dist
+            if head_dir == 1 then
+                dist = head_pos - i
+            else
+                dist = i - head_pos
+            end
+
+            if i == head_pos then
+                parts[i] = string.format('<span foreground="%s">%s</span>',
+                    HEAD_COLOR, HEAD_CHAR)
+            elseif dist > 0 and dist <= TAIL_LEN then
+                -- хвост: затухание от 0 (у головы) до 1 (конец хвоста)
+                local t = (dist - 1) / TAIL_LEN
+                local color = fade_color(t)
+                parts[i] = string.format('<span foreground="%s">%s</span>',
+                    color, BODY_CHAR)
+            else
+                -- пусто
+                parts[i] = string.format('<span foreground="%s">%s</span>',
+                    EMPTY_COLOR, EMPTY_CHAR)
+            end
+        end
+        snake_widget.markup = table.concat(parts)
+    end
+
+    local function start_snake()
+        if snake_timer then return end
+        snake_timer = gears.timer {
+            timeout = SNAKE_TICK / 1000,
+            autostart = true,
+            callback = function()
+                head_pos = head_pos + head_dir
+                if head_pos >= SNAKE_LEN then
+                    head_pos = SNAKE_LEN
+                    head_dir = -1
+                elseif head_pos <= 1 then
+                    head_pos = 1
+                    head_dir = 1
+                end
+                render_snake()
+            end
+        }
+        render_snake()
+    end
+
+    local function stop_snake()
+        if snake_timer then
+            snake_timer:stop()
+            snake_timer = nil
+        end
+    end
+
+    -- ---- Иконки задач ----
     local function update_task_icons()
         container:reset()
-        local tag = s.selected_tag
-        if not tag then return end
 
-        for _, c in ipairs(tag:clients()) do
+        local tag = s.selected_tag
+        if not tag then
+            container:add(snake_widget)
+            start_snake()
+            return
+        end
+
+        local clients = tag:clients()
+
+        if #clients == 0 then
+            container:add(snake_widget)
+            start_snake()
+            return
+        end
+
+        stop_snake()
+
+        for _, c in ipairs(clients) do
             local icon_widget
-            
             if c.icon then
                 icon_widget = wibox.widget {
                     image = c.icon,
@@ -210,30 +323,25 @@ local function create_task_icons_widget(s)
         end
     end
 
+    -- ---- Сигналы ----
     tag.connect_signal("property::selected", function(t)
         if t.screen == s then update_task_icons() end
     end)
-    
     client.connect_signal("manage", function(c)
         if c.screen == s then update_task_icons() end
     end)
-    
     client.connect_signal("unmanage", function(c)
         if c.screen == s then update_task_icons() end
     end)
-    
     client.connect_signal("tagged", function(c)
         if c.screen == s then update_task_icons() end
     end)
-    
     client.connect_signal("untagged", function(c)
         if c.screen == s then update_task_icons() end
     end)
-    
     client.connect_signal("property::visible", function(c)
         if c.screen == s then update_task_icons() end
     end)
-    
     client.connect_signal("property::icon", function(c)
         if c.screen == s then update_task_icons() end
     end)
@@ -545,10 +653,20 @@ function set_keyboard_layout(layout)
     awful.spawn("setxkbmap " .. layout, false)
 
     local flag = (layout == "ru") and "🇷🇺" or "🇺🇸"
+    local name = (layout == "ru") and "Русский" or "English"
+
     kb_layout_widget.icon.markup = string.format(
         '<span font="%s">%s</span>',
         beautiful.icon_font, flag
     )
+
+    naughty.notify({
+        preset = naughty.config.presets.normal,
+        title = "⌨️KKeyboard layout",
+        text = flag .. "  " .. name,
+        timeout = 3.0,
+        width = 300,
+    })
 end
 
 function toggle_keyboard_layout()
@@ -649,7 +767,7 @@ awful.screen.connect_for_each_screen(function(s)
         bg = beautiful.bg_normal,
         fg = beautiful.fg_normal,
         border_width = 2,
-        border_color = "#244A98",
+        border_color = "#2B54F6",
         shape = gears.shape.rounded_rect,
         ontop = true,
         visible = true,
@@ -677,7 +795,7 @@ awful.screen.connect_for_each_screen(function(s)
         bg = beautiful.bg_normal,
         fg = beautiful.fg_normal,
         border_width = 2,
-        border_color = "#244A98",
+        border_color = "#2B54F6",
         shape = gears.shape.rounded_rect,
         ontop = true,
         visible = true,
@@ -705,7 +823,7 @@ awful.screen.connect_for_each_screen(function(s)
         bg = beautiful.bg_normal,
         fg = beautiful.fg_normal,
         border_width = 3,
-        border_color = "#244A98",
+        border_color = "#2B54F6",
         shape = gears.shape.rounded_rect,
         ontop = true,
         visible = true,
@@ -733,7 +851,7 @@ awful.screen.connect_for_each_screen(function(s)
         bg = beautiful.bg_normal,
         fg = beautiful.fg_normal,
         border_width = 3,
-        border_color = "#244A98",
+        border_color = "#2B54F6",
         shape = gears.shape.rounded_rect,
         ontop = true,
         visible = true,
@@ -762,7 +880,7 @@ awful.screen.connect_for_each_screen(function(s)
         bg = beautiful.bg_normal,
         fg = beautiful.fg_normal,
         border_width = 3,
-        border_color = "#244A98",
+        border_color = "#2B54F6",
         shape = gears.shape.rounded_rect,
         ontop = true,
         visible = true,
@@ -822,6 +940,170 @@ root.buttons(gears.table.join(
     awful.button({}, 5, awful.tag.viewprev)
 ))
 
+
+-- ===== ИНФО-ОКНО (system info) =====
+local function get_username()
+    return os.getenv("USER") or os.getenv("LOGNAME") or "unknown"
+end
+
+local function collect_system_info(callback)
+    local info = {
+        username = get_username(),
+        cpu_temp = "—",
+        ram      = "—",
+        disk     = "—",
+        packages = "—",
+    }
+
+    local pending = 4
+    local function done()
+        pending = pending - 1
+        if pending == 0 then callback(info) end
+    end
+
+    awful.spawn.easy_async_with_shell(
+        "for hwmon in /sys/class/hwmon/hwmon*; do " ..
+        "if [ -f \"$hwmon/name\" ]; then " ..
+        "name=$(cat \"$hwmon/name\"); " ..
+        "if [ \"$name\" = \"k10temp\" ] || [ \"$name\" = \"coretemp\" ] || [ \"$name\" = \"zenpower\" ]; then " ..
+        "cat \"$hwmon/temp1_input\"; break; " ..
+        "fi; fi; done 2>/dev/null | awk '{printf \"%.1f\", $1/1000}'",
+        function(stdout)
+            if stdout and stdout ~= "" then info.cpu_temp = stdout .. " °C" end
+            done()
+        end
+    )
+
+    awful.spawn.easy_async_with_shell(
+        "free -h | awk '/^Mem:/ {print $3 \" / \" $2}'",
+        function(stdout)
+            if stdout and stdout ~= "" then info.ram = stdout:gsub("%s+$", "") end
+            done()
+        end
+    )
+
+    awful.spawn.easy_async_with_shell(
+        "df -h / | awk 'NR==2 {print $3 \" / \" $2 \" (\" $5 \")\"}'",
+        function(stdout)
+            if stdout and stdout ~= "" then info.disk = stdout:gsub("%s+$", "") end
+            done()
+        end
+    )
+
+    awful.spawn.easy_async_with_shell(
+        "pacman -Q 2>/dev/null | wc -l",
+        function(stdout)
+            local n = stdout and stdout:match("%d+")
+            if n then info.packages = n end
+            done()
+        end
+    )
+end
+
+-- виджет с текстом (создаём один раз)
+local info_text_widget = wibox.widget {
+    markup = '<span foreground="#aaaaaa">Загрузка...</span>',
+    align = "left",
+    valign = "top",
+    font = beautiful.font,
+    widget = wibox.widget.textbox,
+}
+
+local info_popup = wibox {
+    width  = 420,
+    height = 390,
+    ontop  = true,
+    visible = false,
+    bg = "#000000",
+    border_width = 2,
+    border_color = beautiful.border_focus,
+    type = "notification",
+    widget = wibox.container.background,
+}
+
+info_popup:setup {
+    {
+        {
+            {
+                markup = '<span foreground="#00ff88" font="' .. beautiful.icon_font .. '">󰍹</span>  ' ..
+                         '<span foreground="#ffffff" font="' .. beautiful.font .. '"><b>System Info</b></span>',
+                widget = wibox.widget.textbox,
+            },
+            {
+                forced_height = 1,
+                bg = "#333333",
+                widget = wibox.widget.separator,
+            },
+            info_text_widget,
+            {
+                markup = '<span foreground="#666666">Esc — закрыть</span>',
+                align = "right",
+                font = beautiful.font,
+                widget = wibox.widget.textbox,
+            },
+            layout = wibox.layout.fixed.vertical,
+            spacing = 12,
+        },
+        margins = 20,
+        widget = wibox.container.margin,
+    },
+    bg = "#000000",
+    widget = wibox.container.background,
+}
+
+-- ===== ПЕРЕТАСКИВАНИЕ ИНФО-ОКНА =====
+info_popup:buttons(gears.table.join(
+    awful.button({modkey}, 1, function()
+        local start_x, start_y = mouse.coords().x, mouse.coords().y
+        local orig_x, orig_y   = info_popup.x, info_popup.y
+
+        mousegrabber.run(function(m)
+            -- КЛЮЧЕВОЕ: если кнопка отпущена — граббер останавливается
+            if not m or not m.buttons or not m.buttons[1] then
+                return false
+            end
+            info_popup.x = orig_x + (m.x - start_x)
+            info_popup.y = orig_y + (m.y - start_y)
+            return true
+        end, "fleur")
+    end)
+))
+
+local function refresh_info_popup()
+    info_text_widget.markup = '<span foreground="#aaaaaa">Загрузка...</span>'
+    collect_system_info(function(info)
+        info_text_widget.markup = table.concat({
+            string.format('<span foreground="#aaaaaa">Пользователь:</span>     <span foreground="#ffffff">%s</span>', info.username),
+            string.format('<span foreground="#aaaaaa">Температура CPU:</span>  <span foreground="#ffffff">%s</span>', info.cpu_temp),
+            string.format('<span foreground="#aaaaaa">ОЗУ:</span>             <span foreground="#ffffff">%s</span>', info.ram),
+            string.format('<span foreground="#aaaaaa">Диск /:</span>           <span foreground="#ffffff">%s</span>', info.disk),
+            string.format('<span foreground="#aaaaaa">Пакетов pacman:</span>   <span foreground="#ffffff">%s</span>', info.packages),
+        }, "\n\n")
+    end)
+end
+
+local function toggle_info_popup()
+    if info_popup.visible then
+        info_popup.visible = false
+        return
+    end
+
+    local s = awful.screen.focused()
+    -- центрируем на текущем экране
+    info_popup.x = s.geometry.x + math.floor((s.geometry.width  - info_popup.width)  / 2)
+    info_popup.y = s.geometry.y + math.floor((s.geometry.height - info_popup.height) / 2)
+    info_popup.screen = s
+
+    refresh_info_popup()
+    info_popup.visible = true
+end
+
+gears.timer {
+    timeout = 3, autostart = true,
+    callback = function()
+        if info_popup.visible then refresh_info_popup() end
+    end,
+}
 
 -- ===== ГЛОБАЛЬНЫЕ КЛАВИШИ =====
 globalkeys = gears.table.join(
@@ -884,6 +1166,13 @@ globalkeys = gears.table.join(
             c:relative_move(0, 60, 0, 0)
         end
     end, {description = "переместить float окно вниз", group = "client"}),
+    awful.key({modkey}, "i", function() toggle_info_popup() end,
+          {description = "system info popup", group = "awesome"}),
+awful.key({}, "Escape", function()
+    if info_popup and info_popup.visible then
+        info_popup.visible = false
+    end
+end, {description = "close info popup", group = "awesome"}),
     awful.key({"Mod1"}, "Shift_L", function() toggle_keyboard_layout() end,
               {description = "switch keyboard layout (ru/us)", group = "keyboard"}),
     awful.key({"Mod1"}, "Shift_R", function() toggle_keyboard_layout() end,
