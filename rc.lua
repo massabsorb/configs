@@ -26,6 +26,7 @@ local modkey = "Mod4"
 -- ===== АВТОЗАПУСК =====
 awful.spawn("picom -b")
 awful.spawn("setxkbmap -layout us,ru -option grp:alt_shift_toggle,grp_led:scroll", false)
+awful.spawn("brightnessctl set 50%")
 
 -- ===== ОБРАБОТКА ОШИБОК =====
 if awesome.startup_errors then
@@ -862,7 +863,7 @@ awful.screen.connect_for_each_screen(function(s)
         shape = gears.shape.rounded_rect,
         ontop = true,
         visible = true,
-        x = 400,
+        x = 390,
         y = 10,
         screen = s,
         type = "dock",
@@ -1208,9 +1209,9 @@ awful.key({}, "Escape", function()
         info_popup.visible = false
     end
 end, {description = "close info popup", group = "awesome"}),
-    awful.key({"Mod1"}, "Shift_L", function() toggle_keyboard_layout() end,
+    awful.key({"Shift"}, "Alt_L", function() toggle_keyboard_layout() end,
               {description = "switch keyboard layout (ru/us)", group = "keyboard"}),
-    awful.key({"Mod1"}, "Shift_R", function() toggle_keyboard_layout() end,
+    awful.key({"Shift"}, "Alt_R", function() toggle_keyboard_layout() end,
               {description = "switch keyboard layout (ru/us)", group = "keyboard"}),
     awful.key({modkey}, "s", hotkeys_popup.show_help,
               {description = "show help", group = "awesome"}),
